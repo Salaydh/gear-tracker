@@ -1,0 +1,1651 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Gear Tracker</title>
+<meta name="description" content="Track prototype gear rolls, builds and your collection checklist for The Division 2. Works offline.">
+<meta name="theme-color" content="#0d1013">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Gear Tracker">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root { box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body { margin: 0; padding: 0; }
+img { max-width: 100%; }
+[hidden]:not([hidden=until-found i]) { display: none !important; }
+</style>
+<style>
+/* Layout: SHD-terminal header with a live summary strip, then one full-width card per gear set with six slot tiles; a set can be hidden down to its header. Deliberately dark-only. */
+:root {
+  color-scheme: dark;
+  --bg: #0d1013;
+  --panel: rgba(14,17,21,.80);
+  --panel-2: rgba(24,29,36,.80);
+  --line: #2a323b;
+  --line-strong: #3a444f;
+  --fg: #e6eaee;
+  --muted: #8a96a3;
+  --dim: #5d6873;
+  --shd: #ff7a1a;          /* SHD orange, the one accent */
+  --shd-soft: rgba(255,122,26,.14);
+  --owned: #3ddc84;        /* semantic: acquired */
+  --owned-soft: rgba(61,220,132,.13);
+  --owned-line: rgba(61,220,132,.55);
+  --danger: #ff5a5a;
+  --f-display: "Chakra Petch", "Rajdhani", "Segoe UI", sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--fg); }
+body { font-family: var(--f-body); font-size: 15px; line-height: 1.45; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 24px; padding-block: 28px 64px; }
+@media (max-width: 560px) { .wrap { padding-inline: 16px; } }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--shd); outline-offset: 2px; }
+
+/* Header */
+header.top { display: flex; flex-wrap: wrap; gap: 20px 32px; align-items: flex-end; justify-content: space-between; padding-bottom: 22px; border-bottom: 1px solid var(--line); }
+.brand { display: flex; gap: 14px; align-items: center; }
+.brand-mark { width: 44px; height: 44px; flex: none; }
+h1 { margin: 0; font-family: var(--f-display); font-weight: 700; letter-spacing: .06em; line-height: 1.02; font-size: clamp(22px, 3vw, 30px); text-wrap: balance; }
+h1 .l1 { display: block; color: var(--shd); font-size: .62em; letter-spacing: .32em; font-weight: 600; }
+.summary { display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-end; }
+.stat { display: grid; gap: 2px; }
+.stat .k { font-family: var(--f-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.stat .v { font-family: var(--f-display); font-weight: 600; font-size: 24px; font-variant-numeric: tabular-nums; }
+.stat .v small { font-size: 14px; color: var(--muted); font-weight: 500; }
+.toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 18px; }
+.save-state { font-family: var(--f-mono); font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 8px; margin-right: auto; }
+.save-state i { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); display: inline-block; }
+.save-state[data-s="cloud"] i { background: var(--owned); }
+.save-state[data-s="saving"] i { background: var(--shd); }
+.save-state[data-s="local"] i { background: var(--shd); }
+.save-state[data-s="error"] i { background: var(--danger); }
+
+.btn { border: 1px solid var(--line-strong); background: var(--panel-2); padding: 7px 14px; border-radius: 3px; font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { border-color: var(--shd); color: var(--shd); background: var(--shd-soft); }
+.btn.primary:hover { background: rgba(255,122,26,.22); }
+.btn.danger { border-color: rgba(255,90,90,.5); color: var(--danger); background: transparent; }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--muted); padding-inline: 8px; }
+.btn.ghost:hover { color: var(--fg); border-color: var(--line); }
+.btn[aria-pressed="true"] { border-color: var(--shd); color: var(--shd); }
+
+/* Set card */
+.sets { display: grid; gap: 22px; margin-top: 24px; }
+.set { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; position: relative; overflow: hidden; }
+.set.complete { border-color: var(--owned-line); }
+.set-head { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; padding: 18px 20px 14px; }
+.set-name { font-family: var(--f-display); font-size: 21px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.set-name-input { font-family: var(--f-display); font-size: 19px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; background: var(--bg); color: var(--fg); border: 1px solid var(--line-strong); border-radius: 3px; padding: 4px 10px; width: min(340px, 100%); }
+.badge { font-family: var(--f-mono); font-size: 12px; font-weight: 600; letter-spacing: .14em; padding: 4px 10px; border-radius: 2px; text-transform: uppercase; white-space: nowrap; }
+.badge.done { color: var(--bg); background: var(--owned); }
+.set-count { margin-left: auto; text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.set-count .n { font-family: var(--f-display); font-size: 22px; font-weight: 600; }
+.set-count .p { color: var(--muted); font-size: 12px; letter-spacing: .12em; }
+.set.complete .set-count .n { color: var(--owned); }
+.bar { height: 6px; background: var(--panel-2); margin: 0 20px; border-radius: 1px; position: relative; overflow: hidden; }
+.bar > span { position: absolute; inset: 0 auto 0 0; background: var(--shd); transition: width .25s ease; }
+.set.complete .bar > span { background: var(--owned); }
+.bar-ticks { position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 2px), var(--panel) calc(10% - 2px) 10%); pointer-events: none; }
+
+.set-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; margin-top: 18px; border-top: 1px solid var(--line); }
+.set.collapsed { padding-bottom: 14px; }
+.set.collapsed .set-head { padding-bottom: 10px; }
+.set.collapsed .set-count .n { font-size: 18px; }
+.hide-btn[aria-pressed="true"] { border-color: var(--muted); color: var(--fg); }
+.slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 18px 20px 20px; }
+@media (max-width: 1100px) { .slots { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .slots { grid-template-columns: minmax(0, 1fr); } }
+.slot { border: 1px solid var(--line); background: var(--panel-2); border-radius: 3px; padding: 12px 12px 13px; display: grid; gap: 10px; align-content: start; }
+.slot.complete { border-color: var(--owned-line); background: linear-gradient(180deg, var(--owned-soft), transparent 70%), var(--panel-2); }
+.slot-top { display: flex; align-items: center; gap: 12px; }
+.slot-art { width: 76px; height: 76px; flex: none; display: grid; place-items: center; border-radius: 4px; border: 1px solid var(--line-strong); background: radial-gradient(circle at 50% 38%, #2b343d, #12171b 72%); position: relative; }
+.slot-art::after { content: ""; position: absolute; inset: 4px; border-radius: 2px; background: repeating-linear-gradient(0deg, rgba(255,255,255,.025) 0 1px, transparent 1px 4px); pointer-events: none; }
+.slot-icon { width: 54px; height: 54px; background: #aeb8c2; -webkit-mask: var(--img) center / contain no-repeat; mask: var(--img) center / contain no-repeat; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); transition: background .2s; }
+.slot-art.partial { border-color: rgba(255,122,26,.6); background: radial-gradient(circle at 50% 38%, #3a2c20, #14110e 72%); }
+.slot-art.partial .slot-icon { background: var(--shd); }
+.slot.complete .slot-icon { background: var(--owned); }
+.slot.complete .slot-art { border-color: var(--owned); background: radial-gradient(circle at 50% 38%, #1f4a33, #0f1a14 72%); box-shadow: 0 0 14px rgba(61,220,132,.25); }
+.slot.complete .slot-art::before { content: "✓"; position: absolute; right: -6px; top: -6px; width: 20px; height: 20px; border-radius: 50%; background: var(--owned); color: var(--bg); font-size: 12px; font-weight: 700; display: grid; place-items: center; z-index: 1; }
+.layout { display: flex; flex-wrap: wrap; gap: 4px; margin-top: -2px; }
+.lt { font-family: var(--f-mono); font-size: 11px; color: var(--muted); border: 1px solid var(--line); padding: 1px 6px; border-radius: 2px; background: var(--panel); max-width: 100%; overflow-wrap: anywhere; }
+.lt.core { color: var(--fg); border-color: var(--line-strong); }
+.lt.talent { color: var(--shd); border-color: rgba(255,122,26,.35); }
+.layout { background: none; border: 0; padding: 0; text-align: left; cursor: pointer; }
+.layout:hover .lt.act { color: var(--fg); border-color: var(--muted); }
+.lt.act { color: var(--muted); border-style: dashed; }
+.layout.unsure .lt.core { color: var(--shd); border-color: rgba(255,122,26,.55); border-style: dashed; }
+.layout.unsure .lt.act { color: var(--shd); border-color: rgba(255,122,26,.55); border-style: solid; background: var(--shd-soft); }
+.layout.mine .lt.core { border-color: var(--owned-line); }
+.layout.mine .lt.act { color: var(--owned); border-color: var(--owned-line); border-style: solid; }
+.lay-edit { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--shd); border-radius: 3px; background: var(--bg); }
+.lay-row { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; align-items: center; font-family: var(--f-mono); font-size: 11px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+.lay-row select { min-width: 0; background: var(--panel-2); color: var(--fg); border: 1px solid var(--line-strong); border-radius: 2px; padding: 6px 8px; font-family: var(--f-mono); font-size: 13px; text-transform: none; letter-spacing: 0; }
+.lay-targets { display: flex; flex-wrap: wrap; gap: 6px; text-transform: none; letter-spacing: 0; }
+.lay-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.lay-btns .btn { padding: 6px 10px; font-size: 11px; }
+.slot-name { font-family: var(--f-display); font-weight: 600; letter-spacing: .1em; text-transform: uppercase; font-size: 14px; }
+.slot-frac { margin-left: auto; font-family: var(--f-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.slot.complete .slot-frac { color: var(--owned); font-weight: 600; }
+.attrs { display: flex; flex-wrap: wrap; gap: 8px; }
+.attr { display: inline-flex; align-items: center; gap: 7px; border: 1px dashed var(--line-strong); background: transparent; color: var(--muted); padding: 7px 12px 7px 9px; border-radius: 2px; font-family: var(--f-mono); font-size: 13px; font-weight: 500; letter-spacing: .04em; transition: background .12s, border-color .12s, color .12s; }
+.attr:hover { border-color: var(--muted); color: var(--fg); }
+.attr .box { width: 14px; height: 14px; border: 1.5px solid currentColor; border-radius: 2px; display: grid; place-items: center; flex: none; }
+.attr .box svg { width: 10px; height: 10px; opacity: 0; }
+.attr[aria-pressed="true"] { border-style: solid; border-color: var(--owned); background: var(--owned-soft); color: var(--owned); }
+.attr[aria-pressed="true"] .box { background: var(--owned); border-color: var(--owned); color: var(--bg); }
+.attr[aria-pressed="true"] .box svg { opacity: 1; }
+.attr .st { font-size: 10px; letter-spacing: .14em; opacity: .75; }
+
+.needed { border-left: 1px solid var(--line); padding: 18px 20px 20px; display: grid; gap: 10px; align-content: start; }
+@media (max-width: 900px) { .needed { border-left: 0; border-top: 1px solid var(--line); } }
+.needed h3 { margin: 0; font-family: var(--f-mono); font-size: 12px; font-weight: 600; letter-spacing: .18em; color: var(--shd); }
+.needed ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.needed li { display: flex; gap: 8px; align-items: baseline; padding: 5px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.needed li:last-child { border-bottom: 0; }
+.needed li b { font-weight: 500; min-width: 76px; }
+.needed li span { font-family: var(--f-mono); color: var(--shd); font-size: 13px; }
+.needed .all { font-family: var(--f-mono); font-size: 13px; letter-spacing: .08em; color: var(--owned); font-weight: 600; padding: 10px 12px; border: 1px solid var(--owned-line); background: var(--owned-soft); border-radius: 2px; }
+
+/* Edit panel */
+.edit { border-top: 1px solid var(--line); background: var(--bg); padding: 16px 20px 18px; display: grid; gap: 14px; }
+.edit-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.edit-label { font-family: var(--f-mono); font-size: 11px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; min-width: 92px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line-strong); padding: 3px 4px 3px 10px; border-radius: 2px; font-family: var(--f-mono); font-size: 13px; }
+.chip button { background: none; border: 0; color: var(--muted); padding: 2px 6px; font-size: 14px; line-height: 1; }
+.chip button:hover { color: var(--danger); }
+.add-attr { display: inline-flex; gap: 6px; }
+.add-attr input { background: var(--panel); color: var(--fg); border: 1px solid var(--line-strong); border-radius: 2px; padding: 6px 10px; font-family: var(--f-mono); font-size: 13px; width: 170px; max-width: 100%; }
+.confirm { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; color: var(--danger); font-size: 13px; }
+.hint { color: var(--dim); font-size: 12px; font-family: var(--f-mono); }
+
+.empty { border: 1px dashed var(--line-strong); padding: 40px 20px; text-align: center; color: var(--muted); border-radius: 4px; }
+.add-set-row { display: flex; justify-content: center; margin-top: 22px; }
+.example-tag { font-family: var(--f-mono); font-size: 10px; letter-spacing: .14em; color: var(--muted); border: 1px solid var(--line-strong); padding: 2px 7px; border-radius: 2px; text-transform: uppercase; }
+
+/* Set picker */
+[hidden] { display: none !important; }
+.picker { margin-top: 16px; border: 1px solid var(--shd); background: var(--panel); border-radius: 4px; padding: 14px; display: grid; gap: 12px; }
+.picker-top { display: flex; gap: 10px; }
+.picker-top input { flex: 1; min-width: 0; background: var(--bg); color: var(--fg); border: 1px solid var(--line-strong); border-radius: 3px; padding: 10px 12px; font-family: var(--f-body); font-size: 15px; }
+.picker-list { max-height: 360px; overflow-y: auto; display: grid; gap: 14px; }
+.pick-group { display: grid; gap: 6px; }
+.pick-group h4 { margin: 0; font-family: var(--f-mono); font-size: 11px; letter-spacing: .16em; color: var(--muted); text-transform: uppercase; }
+.pick-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; }
+.pick { text-align: left; border: 1px solid var(--line); background: var(--panel-2); border-radius: 3px; padding: 8px 10px; font-size: 14px; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.pick:hover, .pick:focus-visible { border-color: var(--shd); }
+.pick[disabled] { opacity: .45; cursor: default; }
+.pick small { font-family: var(--f-mono); font-size: 10px; letter-spacing: .1em; color: var(--muted); }
+.pick mark { background: none; color: var(--shd); }
+
+/* Research panel */
+.research { border-top: 1px solid var(--line); padding: 14px 20px 18px; display: grid; gap: 12px; background: linear-gradient(180deg, var(--shd-soft), transparent 120px); }
+.research-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.research-head h3 { margin: 0; font-family: var(--f-mono); font-size: 12px; font-weight: 600; letter-spacing: .18em; color: var(--shd); margin-right: auto; }
+.research p { margin: 0; max-width: 75ch; }
+.research .meta { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.research .pulse { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--shd); margin-right: 8px; animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .25; } }
+.rtable-wrap { overflow-x: auto; }
+.rtable { border-collapse: collapse; width: 100%; font-size: 13px; min-width: 720px; }
+.rtable th, .rtable td { text-align: left; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.rtable th { font-family: var(--f-mono); font-size: 11px; letter-spacing: .12em; color: var(--muted); font-weight: 500; text-transform: uppercase; }
+.rtable td:first-child { font-weight: 600; white-space: nowrap; }
+.tag { display: inline-block; font-family: var(--f-mono); font-size: 12px; border: 1px solid var(--line-strong); padding: 1px 6px; border-radius: 2px; margin: 0 4px 3px 0; }
+.rlist { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 13px; }
+.rlist a { color: var(--fg); }
+.rlist a:hover { color: var(--shd); }
+.rsub { font-family: var(--f-mono); font-size: 11px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; margin: 4px 0 0; }
+.rerr { color: var(--danger); font-size: 13px; }
+.rbox { border: 1px solid var(--line-strong); border-radius: 3px; padding: 10px 12px; display: grid; gap: 8px; background: var(--panel-2); }
+.rbox.col { border-color: var(--owned-line); }
+.rbox.old { border-color: rgba(255,122,26,.55); }
+.rbox .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.rlink { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.rlink input { flex: 1; min-width: 200px; background: var(--bg); color: var(--fg); border: 1px solid var(--line-strong); border-radius: 2px; padding: 7px 10px; font-family: var(--f-body); font-size: 14px; }
+.tag.extra { border-style: dashed; color: var(--shd); }
+
+/* Background: SHD-orange glow and a faint grid, drawn in CSS */
+.bg-art { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden;
+  background: radial-gradient(ellipse 70% 50% at 85% -10%, rgba(255,122,26,.16), transparent 70%),
+              radial-gradient(ellipse 60% 45% at 0% 110%, rgba(255,122,26,.08), transparent 70%),
+              var(--bg); }
+.bg-art::before { content: ""; position: absolute; inset: 0;
+  background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: 48px 48px;
+  -webkit-mask-image: radial-gradient(ellipse at 50% 30%, #000 20%, transparent 80%); mask-image: radial-gradient(ellipse at 50% 30%, #000 20%, transparent 80%); }
+.wrap { position: relative; z-index: 1; }
+.set, .picker { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+h1 { text-shadow: 0 2px 12px rgba(0,0,0,.8); }
+
+/* Tabs */
+.tabs { display: flex; gap: 4px; align-items: flex-end; margin-top: 18px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.tab { background: none; border: 1px solid transparent; border-bottom: 0; padding: 9px 16px; font-family: var(--f-display); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; font-size: 14px; color: var(--muted); border-radius: 3px 3px 0 0; margin-bottom: -1px; }
+.tab:hover { color: var(--fg); }
+.tab[aria-selected="true"] { color: var(--shd); border-color: var(--line); background: var(--panel); }
+.tabs .save-state { margin-left: auto; margin-right: 0; padding-bottom: 8px; }
+.page-h { margin: 0; font-family: var(--f-display); font-size: 20px; letter-spacing: .06em; text-transform: uppercase; }
+.builds-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 28px; }
+.builds { display: grid; gap: 22px; margin-top: 14px; }
+
+/* Shared form bits */
+.field { display: grid; gap: 4px; min-width: 0; }
+.field > span { font-family: var(--f-mono); font-size: 10px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; }
+.field input, .field select { min-width: 0; width: 100%; background: var(--bg); color: var(--fg); border: 1px solid var(--line-strong); border-radius: 2px; padding: 7px 9px; font-family: var(--f-mono); font-size: 13px; }
+.field input[type=number] { width: 72px; }
+
+/* Dismantle check */
+.dz { margin-top: 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 18px 20px; display: grid; gap: 14px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.dz-form { display: grid; grid-template-columns: minmax(180px, 2fr) repeat(4, minmax(110px, 1fr)); gap: 10px; align-items: end; }
+@media (max-width: 900px) { .dz-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.verdict { border-radius: 3px; padding: 14px 16px; display: grid; gap: 6px; border: 1px solid var(--line-strong); background: var(--panel-2); }
+.verdict b { font-family: var(--f-display); font-size: 20px; letter-spacing: .06em; text-transform: uppercase; }
+.verdict.keep { border-color: var(--owned); background: var(--owned-soft); }
+.verdict.keep b { color: var(--owned); }
+.verdict.maybe { border-color: var(--shd); background: var(--shd-soft); }
+.verdict.maybe b { color: var(--shd); }
+.verdict.scrap b { color: var(--fg); }
+.verdict p { margin: 0; font-size: 14px; max-width: 75ch; }
+.verdict .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+
+/* Build card */
+.build { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.build-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 14px 20px; border-bottom: 1px solid var(--line); }
+.build-name { flex: 1; min-width: 160px; background: transparent; border: 1px solid transparent; color: var(--fg); font-family: var(--f-display); font-size: 19px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; padding: 4px 8px; border-radius: 3px; }
+.build-name:hover, .build-name:focus { border-color: var(--line-strong); background: var(--bg); }
+.build-body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; }
+@media (max-width: 1000px) { .build-body { grid-template-columns: minmax(0, 1fr); } }
+.bslots { display: grid; gap: 8px; padding: 14px 20px 18px; }
+.bslot { display: grid; grid-template-columns: 34px 92px minmax(150px, 1.4fr) minmax(150px, 1fr) minmax(0, 2.4fr) 100px; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.bslot:last-child { border-bottom: 0; }
+@media (max-width: 1180px) { .bslot { grid-template-columns: 34px 1fr 1fr; } .bslot .subs, .bslot .own { grid-column: 2 / -1; } }
+.bslot .ic { width: 30px; height: 30px; background: #aeb8c2; -webkit-mask: var(--img) center / contain no-repeat; mask: var(--img) center / contain no-repeat; }
+.bslot .sn { font-family: var(--f-display); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; font-size: 13px; }
+.subs { display: flex; flex-wrap: wrap; gap: 6px; align-items: end; }
+.sub { display: flex; gap: 4px; align-items: center; }
+.sub select { width: 150px; }
+.own { font-family: var(--f-mono); font-size: 11px; letter-spacing: .06em; text-align: right; }
+.own .ok { color: var(--owned); font-weight: 600; }
+.own .need { color: var(--shd); }
+.own button { margin-top: 3px; }
+.bsum { border-left: 1px solid var(--line); padding: 14px 20px 18px; display: grid; gap: 12px; align-content: start; }
+@media (max-width: 1000px) { .bsum { border-left: 0; border-top: 1px solid var(--line); } }
+.bsum h3 { margin: 0; font-family: var(--f-mono); font-size: 11px; letter-spacing: .18em; color: var(--shd); }
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.kv span:nth-child(even) { font-family: var(--f-mono); text-align: right; }
+.bonus { font-size: 13px; color: var(--dim); }
+.bonus.on { color: var(--fg); }
+.bonus.on::before { content: "✓ "; color: var(--owned); }
+.warn { color: var(--shd); font-size: 13px; }
+
+/* Collection checklist */
+.col-head { display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: flex-end; justify-content: space-between; margin-top: 24px; }
+.col-head p { margin: 4px 0 0; color: var(--muted); font-size: 13px; max-width: 70ch; }
+.findbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
+.findbar input[type=search] { flex: 1 1 260px; min-width: 0; background: var(--bg); color: var(--fg); border: 1px solid var(--line-strong); border-radius: 3px; padding: 9px 12px; font-family: var(--f-body); font-size: 15px; }
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 3px; overflow: hidden; }
+.seg button { background: var(--panel-2); border: 0; border-right: 1px solid var(--line-strong); padding: 8px 12px; font-family: var(--f-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { color: var(--shd); background: var(--shd-soft); }
+.pin-h { display: flex; align-items: center; gap: 10px; margin: 22px 0 -8px; font-family: var(--f-mono); font-size: 12px; letter-spacing: .16em; color: var(--shd); text-transform: uppercase; }
+.pin-h::after { content: ""; flex: 1; height: 1px; background: rgba(255,122,26,.4); }
+.pin-btn { font-size: 12px; }
+.pin-btn[aria-pressed="true"] { border-color: var(--shd); color: var(--shd); background: var(--shd-soft); }
+.set.pinned { border-color: rgba(255,122,26,.55); }
+.cset .set-head { padding-bottom: 6px; }
+.cnote { margin: 0 20px 12px; color: var(--muted); font-size: 13px; }
+.vtable { display: grid; gap: 0; padding: 6px 20px 16px; overflow-x: auto; }
+.vrow { display: grid; grid-template-columns: 190px repeat(6, minmax(92px, 1fr)) 34px; gap: 6px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); min-width: 860px; }
+.vrow:last-child { border-bottom: 0; }
+.vrow.vh { padding: 0 0 4px; border-bottom: 1px solid var(--line-strong); }
+.vrow.vh span { font-family: var(--f-mono); font-size: 10px; letter-spacing: .14em; color: var(--muted); text-transform: uppercase; display: flex; gap: 6px; align-items: center; }
+.vrow.vh .ic { width: 16px; height: 16px; background: #aeb8c2; -webkit-mask: var(--img) center / contain no-repeat; mask: var(--img) center / contain no-repeat; flex: none; }
+.vlabel { display: grid; gap: 1px; }
+.vlabel b { font-family: var(--f-mono); font-size: 14px; font-weight: 600; color: var(--fg); }
+.vlabel small { font-family: var(--f-mono); font-size: 11px; color: var(--muted); }
+.vrow.vdone .vlabel b { color: var(--owned); }
+.cell { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px dashed var(--line-strong); background: transparent; color: var(--muted); padding: 7px 6px; border-radius: 2px; font-family: var(--f-mono); font-size: 12px; min-height: 34px; }
+.cell:hover { border-color: var(--muted); color: var(--fg); }
+.cell .box { width: 14px; height: 14px; border: 1.5px solid currentColor; border-radius: 2px; display: grid; place-items: center; flex: none; }
+.cell .box svg { width: 10px; height: 10px; opacity: 0; }
+.cell[aria-pressed="true"] { border-style: solid; border-color: var(--owned); background: var(--owned-soft); color: var(--owned); }
+.cell[aria-pressed="true"] .box { background: var(--owned); border-color: var(--owned); color: var(--bg); }
+.cell[aria-pressed="true"] .box svg { opacity: 1; }
+.cell.na { border: 0; color: var(--dim); cursor: default; }
+.cell.off { opacity: .28; }
+.cell.ex { border-style: dotted; color: var(--dim); }
+.cell.linked::after { content: "⇄"; font-size: 10px; color: var(--muted); }
+.cell.withv { flex-wrap: wrap; row-gap: 2px; }
+.cell .vv { flex-basis: 100%; text-align: center; font-size: 11px; color: var(--fg); opacity: .85; font-variant-numeric: tabular-nums; }
+.cellv { display: grid; gap: 4px; align-self: stretch; border: 1px solid var(--owned-line); background: var(--owned-soft); border-radius: 2px; padding: 3px 6px 6px; font-family: var(--f-mono); font-size: 11px; color: var(--owned); min-width: 0; }
+.cellv.off { opacity: .28; }
+.cellv label { display: grid; grid-template-columns: minmax(0, 1fr) 52px; gap: 4px; align-items: center; color: var(--muted); }
+.cellv label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cellv input { min-width: 0; width: 100%; background: var(--bg); color: var(--fg); border: 1px solid var(--line-strong); border-radius: 2px; padding: 3px 5px; font-family: var(--f-mono); font-size: 12px; text-align: right; }
+.cellv input:focus { border-color: var(--shd); outline: none; }
+.cellv .cell.tick { padding: 3px 4px; min-height: 26px; border: 0; background: none; justify-content: flex-start; }
+.cellv .cell.tick.asking { color: var(--danger); }
+.cellv.need { border: 1px dashed var(--line-strong); background: transparent; color: var(--muted); }
+.cellv.need .cell.tick { color: var(--muted); }
+.cellv.need:hover { border-color: var(--muted); }
+.cellv.partial { border-color: rgba(255,122,26,.6); background: var(--shd-soft); }
+.cellv.partial .cell.tick { color: var(--shd); }
+.cellv.partial .cell.tick .box { background: var(--shd); border-color: var(--shd); color: var(--bg); }
+.mv { margin-top: 18px; border: 1px solid rgba(255,122,26,.6); background: var(--panel); border-radius: 4px; padding: 12px 16px 14px; display: grid; gap: 10px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.mv-head { display: flex; justify-content: space-between; align-items: center; background: none; border: 0; padding: 0; text-align: left; font-family: var(--f-mono); font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--shd); }
+.mv-head small { color: var(--muted); letter-spacing: .1em; }
+.mv-list { display: grid; gap: 0; }
+.mv-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) 150px 190px; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.mv-row:last-child { border-bottom: 0; }
+.mv-name { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.mv-name .ic { width: 18px; height: 18px; flex: none; background: var(--shd); -webkit-mask: var(--img) center / contain no-repeat; mask: var(--img) center / contain no-repeat; }
+.mv-var { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.mv-row label { display: grid; grid-template-columns: minmax(0, 1fr) 64px; gap: 6px; align-items: center; font-family: var(--f-mono); font-size: 11px; color: var(--muted); }
+.mv-row label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mv-row input { min-width: 0; width: 100%; background: var(--bg); color: var(--fg); border: 1px solid var(--line-strong); border-radius: 2px; padding: 4px 6px; font-family: var(--f-mono); font-size: 13px; text-align: right; }
+.mv-row input:not(:placeholder-shown) { color: var(--owned); font-weight: 600; }
+@media (max-width: 760px) { .mv-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .mv-name { grid-column: 1 / -1; } .mv-var { grid-column: 1 / -1; margin-top: -6px; } }
+.cellv .need-stats { font-size: 10px; letter-spacing: .06em; color: var(--shd); margin-left: 2px; }
+.cellv input:not(:placeholder-shown) { color: var(--owned); font-weight: 600; }
+.vdel { background: none; border: 0; color: var(--muted); font-size: 16px; padding: 4px; }
+.vdel:hover { color: var(--danger); }
+.vadd { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; padding: 12px 20px 16px; border-top: 1px solid var(--line); background: var(--bg); }
+.vadd .slotpick { display: flex; flex-wrap: wrap; gap: 8px; font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.vadd .slotpick label { display: inline-flex; gap: 4px; align-items: center; }
+.col-add { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; margin-top: 14px; }
+.col-add .field input { width: 260px; }
+@media (max-width: 900px) { .vtable { padding-inline: 12px; } }
+@media (max-width: 760px) {
+  .vrow { min-width: 0; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .vrow .vlabel { grid-column: 1 / -1; display: flex; gap: 10px; align-items: baseline; }
+  .vrow.vh { display: none; }
+  .vrow > span:last-child:empty { display: none; }
+  .vdel { grid-column: 1 / -1; justify-self: end; }
+}
+
+/* Backup controls, first-run banner, footer */
+.backup { display: flex; gap: 6px; align-items: center; }
+.backup .btn { padding: 5px 10px; font-size: 11px; }
+.welcome { margin-top: 18px; border: 1px solid var(--shd); background: var(--panel); border-radius: 4px; padding: 14px 16px; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.welcome p { margin: 0; flex: 1 1 280px; }
+.welcome b { color: var(--shd); }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 10; background: var(--panel-2); border: 1px solid var(--line-strong); border-radius: 4px; padding: 10px 14px; font-family: var(--f-mono); font-size: 12px; max-width: calc(100vw - 32px); }
+footer.foot { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--dim); font-family: var(--f-mono); font-size: 11px; letter-spacing: .04em; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="bg-art" aria-hidden="true"></div>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 44 44" aria-hidden="true">
+        <circle cx="22" cy="22" r="19" fill="none" stroke="var(--shd)" stroke-width="2"/>
+        <circle cx="22" cy="22" r="12" fill="none" stroke="var(--shd)" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <circle cx="22" cy="22" r="4" fill="var(--shd)"/>
+        <path d="M22 1v8M22 35v8M1 22h8M35 22h8" stroke="var(--shd)" stroke-width="2"/>
+      </svg>
+      <h1><span class="l1">DIVISION 2</span>PROTOTYPE GEAR TRACKER</h1>
+    </div>
+    <div class="summary" id="summary"></div>
+  </header>
+
+  <nav class="tabs" aria-label="Pages">
+    <button class="tab" id="tab-tracker" data-page="tracker" aria-selected="true">Farm tracker</button>
+    <button class="tab" id="tab-builds" data-page="builds" aria-selected="false">Builds &amp; dismantle check</button>
+    <button class="tab" id="tab-collection" data-page="collection" aria-selected="false">Collection checklist</button>
+    <span class="save-state" id="saveState" data-s="loading"><i></i><span>Loading your progress…</span></span>
+    <span class="backup">
+      <button class="btn ghost" id="exportBtn" title="Save a backup file of everything on this device">Export</button>
+      <button class="btn ghost" id="importBtn" title="Load a backup file, replacing what is on this device">Import</button>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+    </span>
+  </nav>
+
+  <section class="welcome" id="welcome" hidden>
+    <p><b>First time on this device?</b> Import the backup file from your claude.ai tracker to bring over your sets, builds and checklist. Or just start adding sets.</p>
+    <button class="btn primary" id="welcomeImport">Import backup</button>
+    <button class="btn ghost" id="welcomeDismiss">Start fresh</button>
+  </section>
+
+  <div id="page-tracker">
+  <div class="toolbar">
+    <button class="btn" id="editToggle" aria-pressed="false">Edit sets</button>
+    <button class="btn primary" id="addSet" aria-expanded="false" aria-controls="picker">+ Add gear set</button>
+    <input id="farmSearch" type="search" placeholder="Search your tracked sets, e.g. foundry, armor regen" autocomplete="off" aria-label="Search tracked sets" style="flex:1 1 240px;min-width:0;background:var(--bg);color:var(--fg);border:1px solid var(--line-strong);border-radius:3px;padding:8px 12px;font-size:14px">
+  </div>
+
+  <section class="picker" id="picker" hidden>
+    <div class="picker-top">
+      <input id="pickerSearch" type="search" placeholder="Search gear sets and brands, e.g. strik, hotshot, badger" autocomplete="off" aria-label="Search gear sets and brands">
+      <button class="btn ghost" id="pickerClose">Close</button>
+    </div>
+    <div class="picker-list" id="pickerList" role="listbox" aria-label="Gear sets and brands"></div>
+  </section>
+
+  <main class="sets" id="sets"></main>
+  </div>
+
+  <div id="page-builds" hidden>
+    <section class="dz" id="dismantle" aria-labelledby="dz-title"></section>
+    <div class="builds-head">
+      <h2 class="page-h">Build maker</h2>
+      <button class="btn primary" id="newBuild">+ New build</button>
+    </div>
+    <div class="builds" id="builds"></div>
+  </div>
+
+  <div id="page-collection" hidden></div>
+  <datalist id="allSets"></datalist>
+  <footer class="foot">Unofficial fan tool. Not affiliated with or endorsed by Ubisoft. Progress is saved on this device only; use Export to back it up.</footer>
+</div>
+
+<script>
+const SLOTS = ["Mask", "Backpack", "Chest", "Gloves", "Holster", "Kneepads"];
+// Division 2 gear slot icons (white on transparent), tinted per slot state via CSS mask.
+const ICONS = {"Chest": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGRlZnM+PG1hc2sgaWQ9Im0iIG1hc2tVbml0cz0idXNlclNwYWNlT25Vc2UiIHg9IjAiIHk9IjAiIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PGcgZmlsbD0iI2ZmZiI+PHBhdGggZD0iTTE3IDVoOHY3YzQgNCAxMCA0IDE0IDBWNWg4djExbDcgN3YzMmE0IDQgMCAwIDEtNCA0SDE0YTQgNCAwIDAgMS00LTRWMjNsNy03eiIvPjwvZz48ZyBmaWxsPSIjMDAwIj48cmVjdCB4PSIyMSIgeT0iMjciIHdpZHRoPSIyMiIgaGVpZ2h0PSIxNCIgcng9IjIiLz48cmVjdCB4PSIyNCIgeT0iMzAiIHdpZHRoPSIxNiIgaGVpZ2h0PSI4IiByeD0iMSIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjE1IiB5PSI0NiIgd2lkdGg9IjM0IiBoZWlnaHQ9IjIuNSIvPjxyZWN0IHg9IjE1IiB5PSI1MSIgd2lkdGg9IjM0IiBoZWlnaHQ9IjIuNSIvPjwvZz48L21hc2s+PC9kZWZzPjxyZWN0IHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgZmlsbD0iI2ZmZiIgbWFzaz0idXJsKCNtKSIvPjwvc3ZnPg==", "Mask": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGRlZnM+PG1hc2sgaWQ9Im0iIG1hc2tVbml0cz0idXNlclNwYWNlT25Vc2UiIHg9IjAiIHk9IjAiIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PGcgZmlsbD0iI2ZmZiI+PHBhdGggZD0iTTMyIDVDMjAgNSAxMiAxMyAxMiAyNWMwIDkgNSAxNiAxMSAyMGgxOGM2LTQgMTEtMTEgMTEtMjBDNTIgMTMgNDQgNSAzMiA1eiIvPjxyZWN0IHg9IjQiIHk9IjIxIiB3aWR0aD0iOSIgaGVpZ2h0PSI2IiByeD0iMiIvPjxyZWN0IHg9IjUxIiB5PSIyMSIgd2lkdGg9IjkiIGhlaWdodD0iNiIgcng9IjIiLz48cmVjdCB4PSIyMyIgeT0iNDciIHdpZHRoPSIxOCIgaGVpZ2h0PSIxMyIgcng9IjQiLz48L2c+PGcgZmlsbD0iIzAwMCI+PGVsbGlwc2UgY3g9IjIzIiBjeT0iMjQiIHJ4PSI2LjUiIHJ5PSI2Ii8+PGVsbGlwc2UgY3g9IjQxIiBjeT0iMjQiIHJ4PSI2LjUiIHJ5PSI2Ii8+PHJlY3QgeD0iMjYiIHk9IjUxIiB3aWR0aD0iMTIiIGhlaWdodD0iMiIvPjxyZWN0IHg9IjI2IiB5PSI1NSIgd2lkdGg9IjEyIiBoZWlnaHQ9IjIiLz48L2c+PC9tYXNrPjwvZGVmcz48cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIGZpbGw9IiNmZmYiIG1hc2s9InVybCgjbSkiLz48L3N2Zz4=", "Kneepads": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGRlZnM+PG1hc2sgaWQ9Im0iIG1hc2tVbml0cz0idXNlclNwYWNlT25Vc2UiIHg9IjAiIHk9IjAiIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PGcgZmlsbD0iI2ZmZiI+PHBhdGggZD0iTTIwIDVoMjRhNiA2IDAgMCAxIDYgNnYyOWMwIDEzLTggMTktMTggMjEtMTAtMi0xOC04LTE4LTIxVjExYTYgNiAwIDAgMSA2LTZ6Ii8+PHJlY3QgeD0iNiIgeT0iMTciIHdpZHRoPSIxMCIgaGVpZ2h0PSI2IiByeD0iMiIvPjxyZWN0IHg9IjQ4IiB5PSIxNyIgd2lkdGg9IjEwIiBoZWlnaHQ9IjYiIHJ4PSIyIi8+PHJlY3QgeD0iNiIgeT0iNDAiIHdpZHRoPSIxMCIgaGVpZ2h0PSI2IiByeD0iMiIvPjxyZWN0IHg9IjQ4IiB5PSI0MCIgd2lkdGg9IjEwIiBoZWlnaHQ9IjYiIHJ4PSIyIi8+PC9nPjxnIGZpbGw9IiMwMDAiPjxjaXJjbGUgY3g9IjMyIiBjeT0iMjkiIHI9IjExIi8+PGNpcmNsZSBjeD0iMzIiIGN5PSIyOSIgcj0iNy41IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMTMuNSIgeT0iMTYiIHdpZHRoPSIzIiBoZWlnaHQ9IjMxIi8+PHJlY3QgeD0iNDcuNSIgeT0iMTYiIHdpZHRoPSIzIiBoZWlnaHQ9IjMxIi8+PC9nPjwvbWFzaz48L2RlZnM+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjZmZmIiBtYXNrPSJ1cmwoI20pIi8+PC9zdmc+", "Backpack": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGRlZnM+PG1hc2sgaWQ9Im0iIG1hc2tVbml0cz0idXNlclNwYWNlT25Vc2UiIHg9IjAiIHk9IjAiIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PGcgZmlsbD0iI2ZmZiI+PHBhdGggZD0iTTI1IDNoMTR2MTBoLTRWN2gtNnY2aC00eiIvPjxwYXRoIGQ9Ik0xOSAxMmgyNmE3IDcgMCAwIDEgNyA3djM3YTQgNCAwIDAgMS00IDRIMTZhNCA0IDAgMCAxLTQtNFYxOWE3IDcgMCAwIDEgNy03eiIvPjwvZz48ZyBmaWxsPSIjMDAwIj48cmVjdCB4PSIxOCIgeT0iMjEiIHdpZHRoPSIyOCIgaGVpZ2h0PSIyLjUiIHJ4PSIxIi8+PHJlY3QgeD0iMTkiIHk9IjMzIiB3aWR0aD0iMjYiIGhlaWdodD0iMjAiIHJ4PSIzIi8+PHJlY3QgeD0iMjIiIHk9IjM4IiB3aWR0aD0iMjAiIGhlaWdodD0iMTIiIHJ4PSIyIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMjIiIHk9IjM4IiB3aWR0aD0iMjAiIGhlaWdodD0iMi41Ii8+PC9nPjwvbWFzaz48L2RlZnM+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjZmZmIiBtYXNrPSJ1cmwoI20pIi8+PC9zdmc+", "Gloves": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGRlZnM+PG1hc2sgaWQ9Im0iIG1hc2tVbml0cz0idXNlclNwYWNlT25Vc2UiIHg9IjAiIHk9IjAiIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PGcgZmlsbD0iI2ZmZiI+PHJlY3QgeD0iMTciIHk9IjEyIiB3aWR0aD0iNi41IiBoZWlnaHQ9IjI0IiByeD0iMy4yNSIvPjxyZWN0IHg9IjI0LjUiIHk9IjYiIHdpZHRoPSI2LjUiIGhlaWdodD0iMzAiIHJ4PSIzLjI1Ii8+PHJlY3QgeD0iMzIiIHk9IjYiIHdpZHRoPSI2LjUiIGhlaWdodD0iMzAiIHJ4PSIzLjI1Ii8+PHJlY3QgeD0iMzkuNSIgeT0iMTEiIHdpZHRoPSI2LjUiIGhlaWdodD0iMjUiIHJ4PSIzLjI1Ii8+PHBhdGggZD0iTTE3IDMwaDI5djE0YTggOCAwIDAgMS04IDhIMjVhOCA4IDAgMCAxLTgtOHoiLz48cmVjdCB4PSI3IiB5PSIyOCIgd2lkdGg9IjcuNSIgaGVpZ2h0PSIxOSIgcng9IjMuNzUiIHRyYW5zZm9ybT0icm90YXRlKC0zOCAxMSAzOCkiLz48cmVjdCB4PSIxNyIgeT0iNTQiIHdpZHRoPSIyOSIgaGVpZ2h0PSI3IiByeD0iMiIvPjwvZz48ZyBmaWxsPSIjMDAwIj48cmVjdCB4PSIyMy41IiB5PSIxMiIgd2lkdGg9IjEiIGhlaWdodD0iMjAiLz48cmVjdCB4PSIzMSIgeT0iOCIgd2lkdGg9IjEiIGhlaWdodD0iMjQiLz48cmVjdCB4PSIzOC41IiB5PSIxMiIgd2lkdGg9IjEiIGhlaWdodD0iMjAiLz48cmVjdCB4PSIyMSIgeT0iMzgiIHdpZHRoPSIyMSIgaGVpZ2h0PSIyLjUiIHJ4PSIxIi8+PC9nPjwvbWFzaz48L2RlZnM+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjZmZmIiBtYXNrPSJ1cmwoI20pIi8+PC9zdmc+", "Holster": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGRlZnM+PG1hc2sgaWQ9Im0iIG1hc2tVbml0cz0idXNlclNwYWNlT25Vc2UiIHg9IjAiIHk9IjAiIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PGcgZmlsbD0iI2ZmZiI+PHJlY3QgeD0iMjMiIHk9IjIiIHdpZHRoPSIxMyIgaGVpZ2h0PSIyMCIgcng9IjMiIHRyYW5zZm9ybT0icm90YXRlKC0xNCAyOSAxMikiLz48cGF0aCBkPSJNMTkgMTloMjZsMyA1djI0YzAgNy01IDEyLTEyIDEzaC02Yy03LTEtMTEtNi0xMS0xM3oiLz48cmVjdCB4PSI0OCIgeT0iMjYiIHdpZHRoPSI5IiBoZWlnaHQ9IjE4IiByeD0iMiIvPjwvZz48ZyBmaWxsPSIjMDAwIj48cmVjdCB4PSIxNSIgeT0iMTYuNSIgd2lkdGg9IjM2IiBoZWlnaHQ9IjIuNSIvPjxyZWN0IHg9IjI0IiB5PSIyNCIgd2lkdGg9IjE4IiBoZWlnaHQ9IjUiIHJ4PSIxIi8+PHJlY3QgeD0iNDUuNSIgeT0iMjQiIHdpZHRoPSIyLjUiIGhlaWdodD0iMjIiLz48L2c+PC9tYXNrPjwvZGVmcz48cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIGZpbGw9IiNmZmYiIG1hc2s9InVybCgjbSkiLz48L3N2Zz4="};
+const CHECK = '<svg viewBox="0 0 10 10"><path d="M1.5 5.2l2.2 2.2 4.8-5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
+const LS_KEY = "d2-proto-tracker-v1";
+const RESEARCH_TRIGGER = "";   // research runs from the claude.ai version only
+
+// Gear sets and brand sets in the live game (GrindOut list updated 2026-09-24, plus Ember Engine from Red Horizon).
+const GEAR_SETS = ["Aces and Eights","Aegis","Breaking Point","Cavalier","Concentrated Company","Core Strength","Eclipse Protocol","Ember Engine","Foundry Bulwark","Future Initiative","Hard Wired","Heartbreaker","Hotshot","Hunter's Fury","Measured Assembly","Negotiator's Dilemma","Ongoing Directive","Ortiz: Exuro","Ortiz: Reficere","Refactor","Rigger","Striker's Battlegear","System Corruption","Tip of the Spear","Tipping Scales","True Patriot","Umbra Initiative","Virtuoso"];
+const BRAND_SETS = ["5.11 Tactical","Airaldi","Alps Summit","Badger Tuff","Belstone Armory","Brazos de Arcabuz","Ceska Vyroba","China Light","Douglas & Harding","Edelweiss GPz","Electrique","Empress International","Fenris Group","Gila Guard","Golan Gear","Grupo Sombra","Habsburg Guard","Hana-U","Imminence Armaments","Legatus","Lengmo","Murakami Industries","Overlord Armaments","Palisade Steelworks","Petrov Defense Group","Providence Defense","Richter & Kaiser","Royal Works","Shiny Monkey Gear","Sokolov","Unit Alloys","Urban Lookout","Uzina Getica","Walker, Harris & Co","Wyvern Wear","Yaahl Gear","Zwiadowka"];
+const norm = s => s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "");
+const slug = s => s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80) || "set";
+
+const uid = () => Math.random().toString(36).slice(2, 10);
+const defaultState = () => ({
+  version: 1,
+  sets: [{ id: uid(), name: "Example set", example: true, attrs: ["CHC", "CHD"], owned: {} }]
+});
+
+let state = null;
+let editing = false;
+const pendingDelete = new Set();
+let dbDoc = null;          // db document for this viewer, when available
+let saveTimer = null, writing = false, dirty = false, lastWritten = "";
+let dbRef = null;          // db namespace, for research docs
+let research = {};         // research/<id> docs, live
+const researchOpen = new Set();
+const researchMsg = {};    // set id -> local status text while starting a run
+
+/* ---------- storage ---------- */
+function lsRead() { try { const s = localStorage.getItem(LS_KEY); return s ? JSON.parse(s) : null; } catch { return null; } }
+function lsWrite(s) { try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch {} }
+function valid(s) { return s && Array.isArray(s.sets); }
+const LS_RESEARCH = "d2-proto-research-v1";
+function lsReadResearch() { try { const s = localStorage.getItem(LS_RESEARCH); const v = s ? JSON.parse(s) : null; return v && typeof v === "object" ? v : {}; } catch { return {}; } }
+function lsWriteResearch(r) { try { localStorage.setItem(LS_RESEARCH, JSON.stringify(r)); } catch {} }
+
+function setSaveState(kind, text) {
+  const el = document.getElementById("saveState");
+  el.dataset.s = kind; el.querySelector("span").textContent = text;
+}
+
+function persist() {
+  lsWrite(state);
+  if (!dbDoc) { setSaveState("local", "Saved on this device"); return; }
+  dirty = true;
+  setSaveState("saving", "Saving…");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flush, 350);
+}
+async function flush() {
+  if (writing || !dirty || !dbDoc) return;
+  writing = true; dirty = false;
+  const body = JSON.parse(JSON.stringify(state));
+  lastWritten = JSON.stringify(body);
+  try {
+    await dbDoc.set(body);
+    setSaveState("cloud", "Saved to your account");
+  } catch (e) {
+    setSaveState("error", "Couldn't save to your account. Kept in this browser.");
+  } finally {
+    writing = false;
+    if (dirty) flush();
+  }
+}
+
+async function initStorage() {
+  const local = lsRead();
+  firstRun = !valid(local);
+  state = valid(local) ? local : defaultState();
+  research = lsReadResearch();
+  showWelcome();
+  const hadCollection = !!state.collection;
+  render();
+  if (!hadCollection) lsWrite(state);
+  setSaveState("local", "Saved on this device");
+  let db = null, user = null;
+  try { if (window.claude?.use) [db, user] = await Promise.all([claude.use("db"), claude.use("user")]); } catch {}
+  if (!db || !user) return;
+  const id = await user.id().catch(() => null);
+  if (!id) return;
+  // Shared doc so Claude can add sets or mark pieces from chat; the artifact is private to its owner.
+  dbDoc = db.doc("tracker/main");
+  try {
+    const snap = await dbDoc.get();
+    const remote = snap.exists ? snap.data() : null;
+    if (valid(remote)) {
+      state = JSON.parse(JSON.stringify(remote));
+      lastWritten = JSON.stringify(remote);
+      lsWrite(state); render();
+      setSaveState("cloud", "Saved to your account");
+      if (ensureCollection() || !remote.collection) persist();   // first visit after the checklist was added
+    } else {
+      dirty = true; await flush();   // first visit: store what this browser has
+    }
+    // Pick up changes made on another device or tab.
+    dbDoc.onSnapshot(s => {
+      if (!s.exists || s.metadata.hasPendingWrites || writing || dirty) return;
+      const d = s.data(); if (!valid(d)) return;
+      const str = JSON.stringify(d);
+      if (str === lastWritten || str === JSON.stringify(state)) return;
+      lastWritten = str; state = JSON.parse(str); lsWrite(state); render();
+    }, () => {});
+    dbRef = db;
+    db.collection("research").onSnapshot(qs => {
+      research = {};
+      for (const d of qs.docs) research[d.id] = d.data();
+      lsWriteResearch(research);
+      render();
+    }, () => {});
+    render();
+  } catch {
+    dbDoc = null;
+    setSaveState("local", "Saved on this device");
+  }
+}
+
+/* ---------- derived ---------- */
+function isOwned(set, slot, attr) { return !!(set.owned[slot] && set.owned[slot][attr]); }
+function setStats(set) {
+  let total = 0, found = 0; const missing = []; const slots = {};
+  for (const slot of SLOTS) {
+    let n = 0; const ts = slotTargets(set, slot); total += ts.length;
+    for (const a of ts) { if (isOwned(set, slot, a)) n++; else missing.push([slot, a]); }
+    slots[slot] = n; found += n;
+  }
+  return { total, found, missing, slots, pct: total ? Math.round(found / total * 100) : 0 };
+}
+
+/* ---------- render ---------- */
+const h = (tag, attrs = {}, ...kids) => {
+  const el = tag === "svg" ? document.createElementNS("http://www.w3.org/2000/svg", "svg") : document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") el.setAttribute("class", v);
+    else if (k === "html") el.innerHTML = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) el.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) if (c != null) el.append(c.nodeType ? c : document.createTextNode(c));
+  return el;
+};
+
+function renderSummary() {
+  let total = 0, found = 0, done = 0;
+  state.sets.forEach(s => { const st = setStats(s); total += st.total; found += st.found; if (st.total && st.found === st.total) done++; });
+  const el = document.getElementById("summary");
+  el.replaceChildren(
+    h("div", { class: "stat" }, h("span", { class: "k" }, "Pieces found"), h("span", { class: "v" }, String(found), h("small", {}, " / " + total))),
+    h("div", { class: "stat" }, h("span", { class: "k" }, "Overall"), h("span", { class: "v" }, (total ? Math.round(found / total * 100) : 0) + "%")),
+    h("div", { class: "stat" }, h("span", { class: "k" }, "Sets complete"), h("span", { class: "v" }, String(done), h("small", {}, " / " + state.sets.length)))
+  );
+}
+
+function renderSet(set) {
+  const st = setStats(set);
+  const complete = st.total > 0 && st.found === st.total;
+  // Hidden sets collapse to their header bar (kept in state.farmHidden so it follows you across devices). Edit mode shows everything.
+  const hidden = (state.farmHidden || []).includes(set.id);
+  const collapsed = hidden && !editing;
+
+  const head = h("div", { class: "set-head" },
+    editing
+      ? h("input", { class: "set-name-input", id: "name-" + set.id, value: set.name, "aria-label": "Set name",
+          onchange: e => { if (!set.base) set.base = set.name; if (!set.rid) set.rid = slug(set.base); set.name = e.target.value.trim() || "Untitled set"; delete set.example; persist(); render(); } })
+      : h("h2", { class: "set-name" }, set.name),
+    set.example && !editing ? h("span", { class: "example-tag" }, "Example") : null,
+    !editing && set.base && norm(set.base) !== norm(set.name) ? h("span", { class: "example-tag" }, set.base) : null,
+    complete ? h("span", { class: "badge done" }, "Set complete ✓") : null,
+    h("button", { class: "btn hide-btn", "aria-pressed": hidden ? "true" : "false", "aria-expanded": hidden ? "false" : "true",
+      title: hidden ? "Show this set's pieces" : "Hide this set's pieces until you work on it again",
+      onclick: () => { const hs = state.farmHidden || (state.farmHidden = []); const i = hs.indexOf(set.id); if (i >= 0) hs.splice(i, 1); else hs.push(set.id); persist(); render(); } },
+      hidden ? "▸ Show" : "▾ Hide"),
+    (() => { const pins = state.farmPins || (state.farmPins = []); const on = pins.includes(set.id);
+      return h("button", { class: "btn pin-btn", "aria-pressed": on ? "true" : "false", disabled: !on && pins.length >= MAX_PINS ? "" : false,
+        title: on ? "Unpin" : pins.length >= MAX_PINS ? "You already have 3 pinned. Unpin one first." : "Pin to the top for this session", onclick: () => togglePin(pins, set.id) }, on ? "★ Pinned" : "☆ Pin"); })(),
+    h("button", { class: "btn" + (researchOpen.has(set.id) ? " primary" : ""), "aria-expanded": researchOpen.has(set.id) ? "true" : "false",
+      onclick: () => { researchOpen.has(set.id) ? researchOpen.delete(set.id) : researchOpen.add(set.id); render(); } },
+      research[rid(set)]?.status === "queued" ? "Researching…" : "Research meta"),
+    h("div", { class: "set-count" },
+      h("div", { class: "n" }, `${st.found} / ${st.total} FOUND`),
+      h("div", { class: "p" }, `${st.pct}% COMPLETE`))
+  );
+
+  const bar = h("div", { class: "bar", role: "progressbar", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": st.pct, "aria-label": set.name + " progress" },
+    h("span", { style: `width:${st.pct}%` }), h("i", { class: "bar-ticks" }));
+
+  const slots = h("div", { class: "slots" }, SLOTS.map(slot => {
+    const ts = slotTargets(set, slot);
+    const n = st.slots[slot], full = ts.length > 0 && n === ts.length;
+    return h("section", { class: "slot" + (full ? " complete" : "") },
+      h("div", { class: "slot-top" },
+        h("span", { class: "slot-art" + (n > 0 && !full ? " partial" : "") }, h("span", { class: "slot-icon", "aria-hidden": "true", style: `--img:url(${ICONS[slot]})` })),
+        h("span", { class: "slot-name" }, slot),
+        h("span", { class: "slot-frac" }, full ? `COMPLETE ✓` : `${n} / ${ts.length}`)),
+      renderLayout(set, slot),
+      h("div", { class: "attrs" }, ts.length ? ts.map(a => {
+        const own = isOwned(set, slot, a);
+        return h("button", { class: "attr", "aria-pressed": own ? "true" : "false", title: own ? "Owned. Click to mark not owned" : "Not owned. Click to mark owned",
+          onclick: () => toggle(set, slot, a) },
+          h("span", { class: "box", html: CHECK }), a);
+      }) : h("span", { class: "hint" }, "No targets. Click the core/sub line above to set one")));
+  }));
+
+  const card = h("article", { class: "set" + (complete ? " complete" : "") + ((state.farmPins || []).includes(set.id) ? " pinned" : "") + (collapsed ? " collapsed" : "") }, head, bar);
+  if (collapsed) return card;
+  card.append(h("div", { class: "set-body" }, slots));
+  if (researchOpen.has(set.id)) card.append(renderResearch(set));
+  if (editing) card.append(renderEdit(set));
+  return card;
+}
+
+/* ---------- piece layout (core / subs), confirmable ---------- */
+function renderLayout(set, slot) {
+  const key = set.id + "|" + slot;
+  if (layoutEdit === key) return renderLayoutEditor(set, slot);
+  const L = slotLayout(set, slot);
+  const coreText = L.source === "research" && L.unsure ? L.core.replace(/^unconfirmed\s*\(?(likely\s*)?/i, "").replace(/\)$/, "") : L.core;
+  const subsText = L.subs ? L.subs + (L.subs === 1 ? " sub" : " subs") : "";
+  const title = L.source === "you" ? "Confirmed by you. Click to change."
+    : L.source === "collection" ? `From your Collection checklist (keeps ${(L.subAttrs || []).join(", ")}). Click to confirm or change.`
+    : L.source === "research" ? (L.unsure ? "Research couldn't confirm this. Click to set it." : "From meta research. Click to change.")
+    : "General rule for this set type. Click to set the real values.";
+  return h("button", { class: "layout" + (L.source === "you" ? " mine" : L.unsure ? " unsure" : ""), title,
+      onclick: () => openLayoutEdit(set, slot) },
+    coreText ? h("span", { class: "lt core" }, (L.unsure ? "? " : "") + coreText) : null,
+    subsText ? h("span", { class: "lt" }, subsText) : null,
+    L.talent ? h("span", { class: "lt talent" }, talentName(L.talent)) : null,
+    h("span", { class: "lt act" }, L.source === "you" ? "✓ Confirmed" : L.unsure ? "Confirm" : "Edit"));
+}
+
+// Targets for one slot: the ones you confirmed for that slot, otherwise the set-wide list.
+function slotTargets(set, slot) {
+  const L = set.layout && set.layout[slot];
+  if (L && L.confirmed && !Array.isArray(L.targets) && L.subAttrs && L.subAttrs.length) L.targets = expandTargets(L.subAttrs);  // older confirms: the chosen sub is the target
+  if (L && Array.isArray(L.targets) && L.targets.some(t => /^(CHC \+ CHD|CHD \+ CHC)$/i.test(t))) L.targets = splitCritCombos(L.targets);
+  return L && L.confirmed && Array.isArray(L.targets) ? L.targets : set.attrs;
+}
+const comboLabel = subs => subs.filter(Boolean).join(" + ");
+const CRIT_PAIR = "CHC / CHD";
+// Turn a chosen roll into farm targets. CHC and CHD are farmed as one piece of each, so
+// "CHC / CHD" (or CHC + CHD picked together) becomes two separate targets.
+function expandTargets(subs) {
+  const a = subs.filter(Boolean);
+  const isCrit = x => x === "CHC" || x === "CHD";
+  if (a.length === 1 && a[0] === CRIT_PAIR) return ["CHC", "CHD"];
+  if (a.length === 2 && isCrit(a[0]) && isCrit(a[1]) && a[0] !== a[1]) return ["CHC", "CHD"];
+  if (a.length === 2 && a.includes(CRIT_PAIR)) { const other = a.find(x => x !== CRIT_PAIR); return other === CRIT_PAIR ? ["CHC", "CHD"] : ["CHC + " + other, "CHD + " + other]; }
+  return a.length ? [comboLabel(a)] : [];
+}
+const splitCritCombos = list => [...new Set(list.flatMap(t => /^(CHC \+ CHD|CHD \+ CHC)$/i.test(t) ? ["CHC", "CHD"] : [t]))];
+let layoutDraft = null;
+function openLayoutEdit(set, slot) {
+  const L = slotLayout(set, slot);
+  const guessCore = CORES.find(c => (L.core || "").toLowerCase().includes(c.toLowerCase())) || CORES[0];
+  const pre = L.subAttrs || [];
+  layoutEdit = set.id + "|" + slot;
+  layoutDraft = { core: L.source === "you" ? L.core : guessCore, subs: L.subs === 2 ? 2 : 1, s1: pre[0] || CRIT_PAIR, s2: pre[1] || "CHD", targets: [...slotTargets(set, slot)] };
+  render();
+}
+
+function renderLayoutEditor(set, slot) {
+  const d = layoutDraft;
+  const id = x => `lay-${set.id}-${slot}-${x}`;
+  const groups = SUB_GROUPS.map(([g, list]) => [g, g === "Offensive" ? [CRIT_PAIR, ...list] : list]);
+  const subSel = (k) => h("select", { id: id(k), "aria-label": k === "s1" ? "Sub attribute 1" : "Sub attribute 2", onchange: e => { d[k] = e.target.value; } },
+    groups.map(([g, list]) => h("optgroup", { label: g }, list.map(a => h("option", { value: a, selected: a === d[k] ? "" : false }, a === CRIT_PAIR ? "CHC / CHD (one of each)" : a)))));
+  return h("div", { class: "lay-edit" },
+    h("label", { class: "lay-row" }, h("span", {}, "Core"),
+      h("select", { id: id("core"), onchange: e => { d.core = e.target.value; } }, CORES.map(c => h("option", { value: c, selected: c === d.core ? "" : false }, c)))),
+    h("label", { class: "lay-row" }, h("span", {}, "Subs"),
+      h("select", { id: id("subs"), onchange: e => { d.subs = Number(e.target.value); render(); } },
+        h("option", { value: "1", selected: d.subs === 1 ? "" : false }, "1 sub attribute"),
+        h("option", { value: "2", selected: d.subs === 2 ? "" : false }, "2 sub attributes"))),
+    h("label", { class: "lay-row" }, h("span", {}, "Sub 1"), subSel("s1")),
+    d.subs === 2 ? h("label", { class: "lay-row" }, h("span", {}, "Sub 2"), subSel("s2")) : null,
+    h("div", { class: "lay-row" }, h("span", {}, ""),
+      h("button", { class: "btn", onclick: () => { for (const l of expandTargets(d.subs === 2 ? [d.s1, d.s2] : [d.s1])) if (!d.targets.some(t => norm(t) === norm(l))) d.targets.push(l); render(); } }, "+ Add as target")),
+    h("div", { class: "lay-row" }, h("span", {}, "Farm"),
+      h("div", { class: "lay-targets" }, d.targets.length ? d.targets.map(t => h("span", { class: "chip" }, t,
+        h("button", { "aria-label": "Remove " + t, onclick: () => { d.targets = d.targets.filter(x => x !== t); render(); } }, "×")))
+        : h("span", { class: "hint" }, "No targets. Pick the sub(s) above and press + Add as target."))),
+    h("div", { class: "lay-btns" },
+      h("button", { class: "btn primary", onclick: () => saveLayout([slot]) }, "Confirm"),
+      h("button", { class: "btn", onclick: () => saveLayout(SLOTS), title: "Use this core, subs and targets for every slot in this set" }, "Confirm for all 6"),
+      set.layout && set.layout[slot] ? h("button", { class: "btn ghost", onclick: () => { delete set.layout[slot]; layoutEdit = null; persist(); render(); } }, "Clear") : null,
+      h("button", { class: "btn ghost", onclick: () => { layoutEdit = null; render(); } }, "Cancel")),
+    h("p", { class: "hint" }, `"Farm" is what this slot's buttons track (e.g. Armor Regen). Add more than one to keep several versions.`));
+
+  function saveLayout(slots) {
+    const subAttrs = (d.subs === 2 ? [d.s1, d.s2] : [d.s1]).flatMap(x => x === CRIT_PAIR ? ["CHC", "CHD"] : [x]).slice(0, d.subs === 2 ? 2 : 1);
+    set.layout = set.layout || {};
+    for (const sl of slots) set.layout[sl] = { core: d.core, subs: d.subs, subAttrs, targets: [...d.targets], confirmed: true };
+    layoutEdit = null; layoutDraft = null; delete set.example; persist(); render();
+  }
+}
+
+/* ---------- research ---------- */
+const baseName = set => set.base || set.name;
+const rid = set => set.rid || slug(baseName(set));
+const kindOf = set => set.kind || (GEAR_SETS.some(n => norm(n) === norm(baseName(set))) ? "gearset" : BRAND_SETS.some(n => norm(n) === norm(baseName(set))) ? "brand" : "custom");
+// Per-slot piece layout: from research when available, otherwise the general rule for the set type.
+const CORES = ["Weapon Damage", "Armor", "Skill Tier"];
+const SUB_GROUPS = [
+  ["Offensive", ["CHC", "CHD", "HSD", "Weapon Handling"]],
+  ["Defensive", ["Armor Regen", "Health", "Hazard Protection", "Explosive Resistance"]],
+  ["Utility", ["Skill Damage", "Skill Haste", "Repair Skills", "Status Effects"]]
+];
+const UNSURE = /unconfirm|unknown|unclear|likely|\?/i;
+let layoutEdit = null;      // "setId|slot" being edited
+const talentName = t => String(t || "").split(":")[0].trim();
+// Research docs written under the current rules carry rulesVersion >= RULES_V. Older ones are shown as outdated and never used.
+const RULES_V = 2;
+const VALID_MINORS = SUB_GROUPS.flatMap(g => g[1]);
+const isCurrent = r => !!r && r.status === "done" && (r.rulesVersion || 0) >= RULES_V;
+const isOutdated = r => !!r && r.status === "done" && !isCurrent(r);
+// One strict answer per slot: core is one of the three cores (or two joined with "or"), minors come from the real list only.
+const cleanCore = c => CORES.filter(k => String(c || "").toLowerCase().includes(k.toLowerCase())).join(" or ");
+function cleanAttrs(list, kind) {
+  const out = [];
+  for (const raw of list || []) {
+    const parts = String(raw).split("+").map(x => canonMinor(x.trim())).filter(x => VALID_MINORS.includes(x));
+    if (!parts.length) continue;
+    const labels = kind === "brand" && parts.length > 1 ? [parts.join(" + ")] : parts;
+    for (const l of labels) if (!out.includes(l)) out.push(l);
+  }
+  return kind === "brand" ? out : splitCritCombos(out);
+}
+function researchSlot(set, slot) {
+  const r = research[rid(set)];
+  if (!isCurrent(r) || !r.slots || !r.slots[slot]) return null;
+  const x = r.slots[slot];
+  return { ...x, core: cleanCore(x.core), attrs: cleanAttrs(x.attrs, kindOf(set)) };
+}
+// Collection rows for a set (the plan for the 27 collection sets), or null when the set isn't on the checklist.
+const colFor = set => typeof colSetFor === "function" && state.collection ? colSetFor(baseName(set)) : null;
+const colTargets = cs => cs ? [...new Set(cs.variants.map(v => canonMinor(v.minor)))] : [];
+function researchTargets(set) {
+  const out = [];
+  for (const sl of SLOTS) { const x = researchSlot(set, sl); if (x) for (const a of x.attrs) if (!out.includes(a)) out.push(a); }
+  return out;
+}
+// Per-slot piece layout, in order: what you confirmed, your Collection checklist, current research, the general rule.
+function slotLayout(set, slot) {
+  const mine = set.layout && set.layout[slot];
+  const x = researchSlot(set, slot);
+  const talent = (x && x.talent) || "";
+  if (mine && mine.confirmed) return { core: mine.core, subs: mine.subs, subAttrs: mine.subAttrs || [], talent, source: "you" };
+  const k = kindOf(set);
+  const cs = colFor(set);
+  const rows = cs ? cs.variants.filter(v => vSlots(v).includes(slot)) : [];
+  if (rows.length) {
+    const cores = [...new Set(rows.map(v => v.core))];
+    return { core: cores.join(" or "), subs: (x && x.subs) || (k === "brand" ? 2 : 1), subAttrs: [...new Set(rows.map(v => canonMinor(v.minor)))], talent, source: "collection", unsure: false };
+  }
+  if (x && x.core) return { core: x.core, subs: x.subs, subAttrs: x.attrs, talent, source: "research", unsure: false };
+  if (k === "gearset") return { core: "Set core", subs: 1, talent: slot === "Chest" || slot === "Backpack" ? "Set talent" : "", source: "rule", unsure: true };
+  if (k === "brand") return { core: "Any core", subs: 2, talent: slot === "Chest" || slot === "Backpack" ? "Random talent" : "", source: "rule", unsure: true };
+  return { core: "", subs: 0, talent: "", source: "rule", unsure: true };
+}
+const fmtDate = iso => { try { return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }); } catch { return ""; } };
+
+const researchLink = {};   // set id -> build link or notes typed in the research panel
+async function startResearch(set) {
+  const id = rid(set);
+  const link = String(researchLink[set.id] || "").trim().slice(0, 500);
+  researchMsg[set.id] = "Starting research…"; render();
+  if (!dbRef) { researchMsg[set.id] = "Meta research runs from the claude.ai version of your tracker. Export a backup there and import it here to bring results over."; render(); return; }
+  try {
+    await dbRef.doc("research/" + id).set({ id, name: set.name, kind: kindOf(set), status: "queued", requestedAt: new Date().toISOString(), ...(link ? { link } : {}), inCollection: !!colFor(set) });
+  } catch { researchMsg[set.id] = "Couldn't save the research request. Try again in a moment."; render(); return; }
+  let mcp = null;
+  try { mcp = await claude.use("mcp"); } catch {}
+  if (!mcp) { researchMsg[set.id] = "Request saved. Ask Claude in your project to run it, since this page can't start it directly."; render(); return; }
+  try {
+    await mcp.callTool("Claude Code Remote", "fire_trigger", { trigger_id: RESEARCH_TRIGGER, text: `Research: ${set.name} | kind=${kindOf(set)} | id=${id}${link ? " | link given" : ""}` }, { cache: false });
+    delete researchMsg[set.id];
+  } catch (e) {
+    researchMsg[set.id] = e && e.code === "not_granted" || e && e.code === "consent_denied"
+      ? "Request saved, but this page wasn't allowed to start Claude. Ask Claude in your project to run it."
+      : "Request saved, but Claude couldn't be started from here. Ask Claude in your project to run it.";
+  }
+  render();
+}
+
+// Replace the set's targets after a tap. Owned ticks are kept, so a target that comes back keeps its tick.
+const sameList = (a, b) => a.length === b.length && a.every(x => b.some(y => norm(y) === norm(x)));
+function setTargets(set, list) { set.attrs = [...list]; delete set.example; persist(); render(); }
+function targetSwap(set, list, label) {
+  if (!list.length || sameList(set.attrs, list)) return h("span", { class: "meta" }, "Tracker already matches ✓");
+  return h("button", { class: "btn primary", title: `Changes this tracker's targets from ${set.attrs.join(", ") || "none"} to ${list.join(", ")}. Ticks you already have stay.`,
+    onclick: () => setTargets(set, list) }, label);
+}
+const evidenceText = x => {
+  const e = x.evidence || {};
+  const n = +e.builds || 0;
+  const parts = [n ? `${n} build${n > 1 ? "s" : ""}` : "", e.collection ? "your collection" : ""].filter(Boolean);
+  if (parts.length) return parts.join(" + ");
+  return { "builds": "Meta builds", "collection": "Your collection", "builds+collection": "Builds + your collection" }[x.basis] || "—";
+};
+
+function renderResearch(set) {
+  const r = research[rid(set)];
+  const msg = researchMsg[set.id];
+  const cs = colFor(set);
+  const box = h("div", { class: "research" });
+  const head = h("div", { class: "research-head" }, h("h3", {}, "META RESEARCH"));
+  box.append(head);
+  const stale = r && r.status === "queued" && Date.now() - Date.parse(r.requestedAt || 0) > 15 * 60 * 1000;
+  const running = r && r.status === "queued" && !stale;
+  if (!dbRef) head.append(h("span", { class: "meta" }, "Runs from the claude.ai tracker"));
+  else head.append(h("button", { class: "btn primary", disabled: running || !!msg && msg.startsWith("Starting") ? "" : false, onclick: () => startResearch(set) },
+    stale ? "Try again" : r && r.status === "done" ? "Research again" : "Research current meta"));
+
+  // Collection sets: the checklist decides the targets. Research is optional.
+  if (cs) {
+    const ct = colTargets(cs);
+    box.append(h("div", { class: "rbox col" },
+      h("p", {}, h("b", {}, "Your Collection checklist decides this set. "), `It keeps ${ct.join(", ")}. Research is optional here and only suggests.`),
+      h("div", { class: "row" }, targetSwap(set, ct, "Match tracker to collection"))));
+  }
+  const inpId = "rl-" + set.id;
+  if (dbRef) box.append(h("div", { class: "rlink" },
+    h("input", { id: inpId, type: "text", placeholder: "Optional: paste a build link or notes for Claude to read first", value: researchLink[set.id] || "",
+      "aria-label": "Build link or notes", oninput: e => { researchLink[set.id] = e.target.value; } }),
+    h("span", { class: "hint" }, "Have a screenshot? Post it in the project thread and ask Claude to research from it.")));
+
+  if (msg) box.append(h("p", { class: "meta" }, msg));
+  if (!r) {
+    if (!dbRef) { box.append(h("p", {}, `No meta research for ${set.name} on this device yet. Research runs from the claude.ai version of your tracker; export a backup there and import it here to bring the result over.`)); return box; }
+    box.append(h("p", {}, `Claude looks for current meta builds that use ${set.name} (any build, since Prototypes work the same), checks them against your Collection checklist, and lists the core and minors to keep on each slot. The result appears here, even if you close the page. Nothing on your tracker changes until you tap a button.`));
+    return box;
+  }
+  if (stale) { box.append(h("p", { class: "rerr" }, "The last request didn't finish. Click Try again.")); return box; }
+  if (running) {
+    box.append(h("p", { class: "meta" }, h("span", { class: "pulse" }), `Researching ${r.name || set.name}. Requested ${fmtDate(r.requestedAt)}. The result appears here when it's done.`));
+    return box;
+  }
+  if (r.status === "error") { box.append(h("p", { class: "rerr" }, r.error || "The last research run failed. Try again.")); return box; }
+  if (isOutdated(r)) {
+    box.append(h("div", { class: "rbox old" }, h("p", {}, h("b", {}, "Outdated, re-run. "), `This result (${fmtDate(r.updatedAt)}) was made under the old research rules, so the tracker ignores it. Click Research again for a fresh one.`)));
+    return box;
+  }
+
+  box.append(h("p", { class: "meta" }, `Checked ${fmtDate(r.updatedAt)}${r.confidence ? ` · ${r.confidence} confidence` : ""}${r.link ? " · read your link first" : ""}`));
+  if (r.summary) box.append(h("p", {}, r.summary));
+  const sug = researchTargets(set);
+  const ct = cs ? colTargets(cs) : [];
+  const extra = cs ? sug.filter(a => !ct.some(c => norm(c) === norm(a))) : [];
+  if (!cs && sug.length) box.append(h("div", { class: "rbox" },
+    h("div", { class: "row" }, h("span", {}, "Suggested targets: ", sug.map(a => h("span", { class: "tag" }, a)))),
+    h("div", { class: "row" }, targetSwap(set, sug, "Use these targets"))));
+  if (extra.length) box.append(h("p", { class: "meta" }, "Builds also use ", extra.map(a => h("span", { class: "tag extra" }, a)), extra.length > 1 ? " which aren't in your collection. Add them on the Collection tab if you want them." : " which isn't in your collection. Add it on the Collection tab if you want it."));
+  box.append(h("div", { class: "rtable-wrap" }, h("table", { class: "rtable" },
+    h("thead", {}, h("tr", {}, h("th", {}, "Slot"), h("th", {}, "Core"), h("th", {}, "Keep"), h("th", {}, "Evidence"), h("th", {}, "Talent"), h("th", {}, "Notes"))),
+    h("tbody", {}, SLOTS.map(sl => { const x = researchSlot(set, sl) || {};
+      return h("tr", {}, h("td", {}, sl),
+        h("td", {}, x.core || "—"),
+        h("td", {}, (x.attrs || []).length ? x.attrs.map(a => h("span", { class: "tag" + (cs && !ct.some(c => norm(c) === norm(a)) ? " extra" : "") }, a)) : "—"),
+        h("td", { class: "meta" }, x.core || (x.attrs || []).length ? evidenceText(x) : "—"),
+        h("td", {}, x.talent || "—"),
+        h("td", {}, x.note || "")); })))));
+  if (r.setBonuses && r.setBonuses.length) {
+    box.append(h("p", { class: "rsub" }, "Set bonuses"), h("ul", { class: "rlist" }, r.setBonuses.map(b => h("li", {}, b))));
+  }
+  if (r.builds && r.builds.length) box.append(h("p", { class: "rsub" }, "Builds checked"), h("ul", { class: "rlist" }, r.builds.map(b => h("li", {}, `${b.name}${b.date ? " (" + b.date + ")" : ""}${b.use ? ": " + b.use : ""}`))));
+  if (r.cautions && r.cautions.length) box.append(h("p", { class: "rsub" }, "Before you dismantle or upgrade"), h("ul", { class: "rlist" }, r.cautions.map(c => h("li", {}, c))));
+  if (r.sources && r.sources.length) box.append(h("p", { class: "rsub" }, "Sources"), h("ul", { class: "rlist" }, r.sources.filter(x => /^https:\/\//.test(x.url || "")).map(x => h("li", {}, h("a", { href: x.url, target: "_blank", rel: "noopener" }, x.title || x.url), x.date && x.date !== "unknown" ? ` (${x.date})` : ""))));
+  return box;
+}
+
+/* ---------- set picker ---------- */
+const picker = document.getElementById("picker");
+const pickerSearch = document.getElementById("pickerSearch");
+function openPicker(open) {
+  picker.hidden = !open;
+  document.getElementById("addSet").setAttribute("aria-expanded", open ? "true" : "false");
+  if (open) { pickerSearch.value = ""; renderPicker(); pickerSearch.focus(); }
+}
+function highlight(name, q) {
+  if (!q) return name;
+  const i = name.toLowerCase().indexOf(q.toLowerCase());
+  return i < 0 ? name : [name.slice(0, i), h("mark", {}, name.slice(i, i + q.length)), name.slice(i + q.length)];
+}
+function addFromCatalog(name, kind) {
+  // The same set can be tracked more than once (e.g. one entry per build); extra entries get a numbered name you can rename.
+  const count = state.sets.filter(s => norm(baseName(s)) === norm(name)).length;
+  const cs = colFor({ name });
+  const ct = colTargets(cs);
+  const set = { id: uid(), name: count ? `${name} #${count + 1}` : name, base: name, rid: slug(name), kind, attrs: ct.length ? ct : ["CHC", "CHD"], owned: {} };
+  state.sets.push(set);
+  if (!cs) researchOpen.add(set.id);
+  persist(); openPicker(false); render();
+  const r = research[set.rid];
+  if (!cs && (!r || r.status === "error" || isOutdated(r))) startResearch(set);
+}
+function renderPicker() {
+  const q = pickerSearch.value.trim();
+  const nq = norm(q);
+  const have = {}; for (const s of state.sets) { const k = norm(baseName(s)); have[k] = (have[k] || 0) + 1; }
+  const group = (title, list, kind) => {
+    const items = list.filter(n => !nq || norm(n).includes(nq));
+    if (!items.length) return null;
+    return h("div", { class: "pick-group" }, h("h4", {}, `${title} (${items.length})`),
+      h("div", { class: "pick-items" }, items.map(n => h("button", { class: "pick", role: "option", title: have[norm(n)] ? "Already tracked. Click to add another entry for a different build." : "", onclick: () => addFromCatalog(n, kind) },
+        h("span", {}, highlight(n, q)), have[norm(n)] ? h("small", {}, have[norm(n)] > 1 ? `TRACKED ×${have[norm(n)]} · ADD ANOTHER` : "TRACKED · ADD ANOTHER") : null))));
+  };
+  const parts = [group("Gear sets", GEAR_SETS, "gearset"), group("Brand sets", BRAND_SETS, "brand")].filter(Boolean);
+  if (q && ![...GEAR_SETS, ...BRAND_SETS].some(n => norm(n) === nq))
+    parts.push(h("div", { class: "pick-group" }, h("h4", {}, "Not in the list"),
+      h("div", { class: "pick-items" }, h("button", { class: "pick", onclick: () => addFromCatalog(q, "custom") }, h("span", {}, `Add "${q}"`), h("small", {}, "CUSTOM")))));
+  if (!parts.length) parts.push(h("p", { class: "hint" }, "No matches."));
+  document.getElementById("pickerList").replaceChildren(...parts);
+}
+pickerSearch.addEventListener("input", renderPicker);
+pickerSearch.addEventListener("keydown", e => {
+  if (e.key === "Escape") openPicker(false);
+  if (e.key === "Enter") { const first = document.querySelector("#pickerList .pick:not([disabled])"); if (first) first.click(); }
+});
+document.getElementById("pickerClose").addEventListener("click", () => openPicker(false));
+
+function renderEdit(set) {
+  const inputId = "add-" + set.id;
+  const addAttr = () => {
+    const inp = document.getElementById(inputId);
+    const v = inp.value.trim();
+    if (!v) return;
+    if (!set.attrs.some(a => a.toLowerCase() === v.toLowerCase())) { set.attrs.push(v); delete set.example; persist(); }
+    render();
+    const again = document.getElementById(inputId); if (again) again.focus();
+  };
+  const del = pendingDelete.has(set.id);
+  return h("div", { class: "edit" },
+    h("div", { class: "edit-row" },
+      h("span", { class: "edit-label" }, "Attributes"),
+      set.attrs.map(a => h("span", { class: "chip" }, a,
+        h("button", { "aria-label": "Remove " + a, title: "Remove " + a + " from all slots", onclick: () => {
+          set.attrs = set.attrs.filter(x => x !== a);
+          for (const s of SLOTS) if (set.owned[s]) delete set.owned[s][a];
+          persist(); render();
+        } }, "×"))),
+      h("span", { class: "add-attr" },
+        h("input", { id: inputId, placeholder: "e.g. Weapon Damage", "aria-label": "New attribute",
+          onkeydown: e => { if (e.key === "Enter") addAttr(); } }),
+        h("button", { class: "btn", onclick: addAttr }, "Add"))),
+    h("div", { class: "edit-row" },
+      h("span", { class: "edit-label" }, "Set"),
+      del
+        ? h("span", { class: "confirm" }, `Delete "${set.name}" and its progress?`,
+            h("button", { class: "btn danger", onclick: () => { state.sets = state.sets.filter(s => s.id !== set.id); pendingDelete.delete(set.id); persist(); render(); } }, "Delete"),
+            h("button", { class: "btn ghost", onclick: () => { pendingDelete.delete(set.id); render(); } }, "Cancel"))
+        : [h("button", { class: "btn", onclick: () => { set.owned = {}; persist(); render(); } }, "Clear progress"),
+           h("button", { class: "btn danger", onclick: () => { pendingDelete.add(set.id); render(); } }, "Delete set")]));
+}
+
+function render() {
+  ensureCollection();
+  renderSummary();
+  renderBuildsPage();
+  renderCollectionPage();
+  const wrap = document.getElementById("sets");
+  const ae = document.activeElement; const rlFocus = ae && ae.id && ae.id.startsWith("rl-") ? [ae.id, ae.selectionStart] : null;
+  // Pinned sets first (up to 3), then the rest; the search box narrows both.
+  const pins = state.farmPins = (state.farmPins || []).filter(id => state.sets.some(s => s.id === id));
+  if (state.farmHidden) state.farmHidden = state.farmHidden.filter(id => state.sets.some(s => s.id === id));
+  const words = queryWords(farmQuery);
+  const match = s => !words.length || words.every(w => norm([s.name, baseName(s), ...s.attrs, ...SLOTS.flatMap(sl => slotTargets(s, sl))].join(" ")).includes(SEARCH_ALIAS[w] || w));
+  const pinned = pins.map(id => state.sets.find(s => s.id === id)).filter(match);
+  const rest = state.sets.filter(s => !pins.includes(s.id) && match(s));
+  wrap.replaceChildren(...(!state.sets.length
+    ? [h("div", { class: "empty" }, "No gear sets yet. Use + Add gear set to pick one.")]
+    : !pinned.length && !rest.length ? [h("div", { class: "empty" }, "No tracked sets match that search.")]
+    : [pinned.length ? h("div", { class: "pin-h" }, `Pinned (${pins.length}/${MAX_PINS})`) : null, ...pinned.map(renderSet),
+       pinned.length && rest.length ? h("div", { class: "pin-h", style: "color:var(--muted)" }, "All tracked sets") : null, ...rest.map(renderSet)].filter(Boolean)));
+  if (rlFocus) { const el = document.getElementById(rlFocus[0]); if (el) { el.focus(); try { el.setSelectionRange(rlFocus[1], rlFocus[1]); } catch {} } }
+  const t = document.getElementById("editToggle");
+  t.setAttribute("aria-pressed", editing ? "true" : "false");
+  t.textContent = editing ? "Done editing" : "Edit sets";
+}
+
+/* ---------- page tabs ---------- */
+let page = "tracker";
+try { page = localStorage.getItem("d2-proto-page") || (location.hash === "#builds" ? "builds" : "tracker"); } catch {}
+if (!["tracker", "builds", "collection"].includes(page)) page = "tracker";
+function showPage(p) {
+  page = p;
+  try { localStorage.setItem("d2-proto-page", p); } catch {}
+  document.getElementById("page-tracker").hidden = p !== "tracker";
+  document.getElementById("page-builds").hidden = p !== "builds";
+  document.getElementById("page-collection").hidden = p !== "collection";
+  for (const t of document.querySelectorAll(".tab")) t.setAttribute("aria-selected", t.dataset.page === p ? "true" : "false");
+}
+for (const t of document.querySelectorAll(".tab")) t.addEventListener("click", () => showPage(t.dataset.page));
+
+/* ---------- shared helpers for builds + dismantle ---------- */
+const ALL_SUBS = SUB_GROUPS.flatMap(([, l]) => l);
+const trackedAll = name => state.sets.filter(s => norm(baseName(s)) === norm(name || "") || norm(s.name) === norm(name || ""));
+const findTracked = name => trackedAll(name)[0];
+const setLike = name => findTracked(name) || { name, rid: slug(name || ""), attrs: [], owned: {} };
+// Target label(s) a rolled piece matches: "CHC" for a 1-sub piece, "CHC + CHD" (either order) for 2 subs.
+function labelsFor(subs) {
+  const a = subs.filter(Boolean);
+  if (a.length === 2) return [a[0] + " + " + a[1], a[1] + " + " + a[0]];
+  return a;
+}
+function matchTarget(set, subs, slot) {
+  const wanted = labelsFor(subs).map(norm);
+  return (slot ? slotTargets(set, slot) : set.attrs).find(t => wanted.includes(norm(t))) || null;
+}
+function layoutDefaults(name, slot) {
+  const L = slotLayout(setLike(name), slot);
+  const core = CORES.find(c => (L.core || "").toLowerCase().includes(c.toLowerCase())) || "";
+  return { core, subs: L.subs === 2 ? 2 : 1, subAttrs: L.subAttrs || [] };
+}
+function fillDatalist() {
+  const dl = document.getElementById("allSets");
+  if (dl.childElementCount) return;
+  dl.replaceChildren(...[...GEAR_SETS, ...BRAND_SETS].map(n => h("option", { value: n })));
+}
+function selectEl(id, options, value, onchange, label) {
+  return h("select", { id, "aria-label": label, onchange },
+    options.map(o => Array.isArray(o)
+      ? h("optgroup", { label: o[0] }, o[1].map(v => h("option", { value: v, selected: v === value ? "" : false }, v)))
+      : h("option", { value: o.value ?? o, selected: (o.value ?? o) === value ? "" : false }, o.label ?? o)));
+}
+function trackTarget(name, slot, subs) {
+  const label = labelsFor(subs)[0];
+  if (!label) return;
+  let set = findTracked(name);
+  if (!set) { set = { id: uid(), name, base: name, rid: slug(name), kind: kindOf({ name }), attrs: [], owned: {} }; state.sets.push(set); }
+  if (!matchTarget(set, subs, slot)) { const L = set.layout && set.layout[slot]; if (L && L.confirmed && Array.isArray(L.targets)) L.targets.push(label); else set.attrs.push(label); }
+  persist(); render();
+}
+function markOwned(name, slot, subs) {
+  let set = trackedAll(name).find(e => e.id === dzTarget && matchTarget(e, subs, slot) && !isOwned(e, slot, matchTarget(e, subs, slot)))
+    || trackedAll(name).find(e => { const t = matchTarget(e, subs, slot); return t && !isOwned(e, slot, t); });
+  if (!set) { trackTarget(name, slot, subs); set = trackedAll(name).find(e => matchTarget(e, subs, slot)); }
+  const t = matchTarget(set, subs, slot);
+  set.owned[slot] = set.owned[slot] || {}; set.owned[slot][t] = true;
+  syncFromFarm(set, slot, t);
+  persist(); render();
+}
+
+/* ---------- dismantle check ---------- */
+let dzTarget = null;   // tracked entry that still needs the checked piece
+let dzCol = null;      // checklist row that still needs it
+let dz = { name: "", slot: "Mask", core: "", subs: ["CHC", ""] };
+try { const v = JSON.parse(localStorage.getItem("d2-proto-dz") || "null"); if (v && v.slot) dz = v; } catch {}
+const saveDz = () => { try { localStorage.setItem("d2-proto-dz", JSON.stringify(dz)); } catch {} };
+
+function dzVerdict() {
+  const name = dz.name.trim();
+  if (!name) return { cls: "", title: "Pick a piece", text: "Choose the set or brand, slot and rolls of the piece that dropped." };
+  const subs = dz.subs.filter(Boolean);
+  const set = findTracked(name);
+  const L = slotLayout(setLike(name), dz.slot);
+  const r0 = research[rid(setLike(name))];
+  const r = isCurrent(r0) ? r0 : null;
+  const rx = researchSlot(setLike(name), dz.slot);
+  const inBuilds = (state.builds || []).filter(b => { const p = b.slots && b.slots[dz.slot]; return p && norm(p.source) === norm(name) && subs.length && labelsFor((p.subs || []).map(x => x.a)).map(norm).includes(norm(labelsFor(subs)[0])); });
+  const coreNote = L.source === "you" && dz.core && L.core !== dz.core ? ` Note: you confirmed ${L.core} as this slot's core, but this piece has ${dz.core}.` : "";
+  const buildNote = inBuilds.length ? ` Used in your build${inBuilds.length > 1 ? "s" : ""}: ${inBuilds.map(b => b.name).join(", ")}.` : "";
+
+  const entries = trackedAll(name);
+  const needing = entries.filter(e => { const t = matchTarget(e, subs, dz.slot); return t && !isOwned(e, dz.slot, t); });
+  const owning = entries.filter(e => { const t = matchTarget(e, subs, dz.slot); return t && isOwned(e, dz.slot, t); });
+  // Collection checklist: the plan of exact pieces to keep.
+  const col = colCheck(name, dz.slot, dz.core, subs);
+  const colCores = col ? [...new Set(col.need.map(v => v.core))] : [];
+  const colNeed = col && col.need.length ? (colCores.length > 1
+      ? ` Your collection checklist needs ${dz.slot} ${subs[0]} with ${colCores.join(" or ")} core. Pick the core above to be sure.`
+      : ` Your collection checklist still needs ${col.cs.name} ${dz.slot} ${col.need[0].core} / ${col.need[0].minor}.`) : "";
+  dzCol = col && col.need.length && colCores.length === 1 ? { cs: col.cs, v: col.need[0] } : null;
+  if (needing.length || colNeed) {
+    dzTarget = needing.length ? needing[0].id : null;
+    const farmTxt = needing.length ? `You still need ${dz.slot} ${matchTarget(needing[0], subs, dz.slot)} for ${needing.map(e => e.name).join(", ")}.` : "";
+    return { cls: "keep", title: "Keep it", text: `${farmTxt}${colNeed}${buildNote}${coreNote}`.trim(), action: needing.length || dzCol ? "own" : null }; }
+  const colHave = col && col.have.length ? ` Your collection checklist already has ${col.cs.name} ${dz.slot} ${col.have[0].core} / ${col.have[0].minor}.` : "";
+  if (owning.length || colHave) return { cls: inBuilds.length ? "maybe" : "scrap", title: "Duplicate", text: `${owning.length ? `You already own ${dz.slot} ${matchTarget(owning[0], subs, dz.slot)} for ${owning.map(e => e.name).join(", ")}.` : ""}${colHave} Safe to dismantle unless this one has better roll values.${buildNote}${coreNote}`.trim() };
+  if (col && subs.length && !inBuilds.length) return { cls: "scrap", title: "Not on your list", text: `${col.cs.name} is on your collection checklist, but not as ${dz.slot}${dz.core ? " " + dz.core : ""} / ${subs.join(" + ")}. Safe to dismantle.` };
+  const rTargets = rx && rx.attrs ? rx.attrs : [];
+  const rHit = rTargets.find(t => labelsFor(subs).map(norm).includes(norm(t)));
+  if (rHit) return { cls: "keep", title: "Keep it", text: `Meta research lists ${dz.slot} ${rHit} as worth keeping for ${r.name || name}, but it isn't on your tracker yet.${buildNote}${coreNote}`, action: "track" };
+  if (inBuilds.length) return { cls: "keep", title: "Keep it", text: `It isn't a farming target, but${buildNote.replace(" Used", " it's used")}${coreNote}`, action: "track" };
+  if (set) return { cls: "scrap", title: "Safe to dismantle", text: `${labelsFor(subs)[0] || "This roll"} isn't one of your targets for ${set.name} ${dz.slot}${r && r.status === "done" ? ", and meta research doesn't list it either" : ""}.${coreNote}` };
+  return { cls: "maybe", title: "Not tracked", text: `You don't track ${name} yet${r && r.status === "done" ? " and research doesn't list this roll" : ", and it hasn't been researched"}. Safe to dismantle unless you plan to farm this set.`, action: r ? "track" : "research" };
+}
+
+function renderDismantle() {
+  const box = document.getElementById("dismantle");
+  const d = layoutDefaults(dz.name, dz.slot);
+  const nSubs = d.subs;
+  const v = dzVerdict();
+  const subsSel = [];
+  for (let i = 0; i < nSubs; i++) subsSel.push(h("label", { class: "field" }, h("span", {}, nSubs === 1 ? "Sub attribute" : "Sub " + (i + 1)),
+    selectEl("dz-sub" + i, [["—", [""]], ...SUB_GROUPS], dz.subs[i] || "", e => { dz.subs[i] = e.target.value; saveDz(); renderDismantle(); }, "Sub attribute")));
+  if (nSubs === 1) dz.subs[1] = "";
+  box.replaceChildren(
+    h("h2", { class: "page-h", id: "dz-title" }, "Dismantle check"),
+    h("div", { class: "dz-form" },
+      h("label", { class: "field" }, h("span", {}, "Set or brand"),
+        h("input", { id: "dz-name", list: "allSets", value: dz.name, placeholder: "Type to search", autocomplete: "off",
+          onchange: e => { if (dz.name === e.target.value) return; dz.name = e.target.value; saveDz(); setTimeout(renderDismantle); } })),
+      h("label", { class: "field" }, h("span", {}, "Slot"),
+        selectEl("dz-slot", SLOTS, dz.slot, e => { dz.slot = e.target.value; saveDz(); renderDismantle(); }, "Slot")),
+      h("label", { class: "field" }, h("span", {}, "Core"),
+        selectEl("dz-core", [{ value: "", label: d.core ? `${d.core} (expected)` : "—" }, ...CORES], dz.core, e => { dz.core = e.target.value; saveDz(); renderDismantle(); }, "Core")),
+      ...subsSel),
+    h("div", { class: "verdict " + v.cls },
+      h("b", {}, v.title), h("p", {}, v.text),
+      v.action ? h("div", { class: "row" },
+        v.action === "own" ? h("button", { class: "btn primary", onclick: () => {
+          const nm = dz.name.trim(), c = dzCol;
+          if (dzTarget || trackedAll(nm).some(e => { const t = matchTarget(e, dz.subs, dz.slot); return t && !isOwned(e, dz.slot, t); })) markOwned(nm, dz.slot, dz.subs);
+          if (c && !c.v.got[dz.slot]) { setColGot(c.cs, c.v, dz.slot, true); persist(); render(); } } }, "Mark as owned") : null,
+        v.action === "track" ? [h("button", { class: "btn primary", onclick: () => markOwned(dz.name.trim(), dz.slot, dz.subs) }, "Track and mark owned"),
+                                h("button", { class: "btn", onclick: () => trackTarget(dz.name.trim(), dz.slot, dz.subs) }, "Track as target")] : null,
+        v.action === "research" ? h("button", { class: "btn", onclick: () => { const nm = dz.name.trim(); if (!findTracked(nm)) { state.sets.push({ id: uid(), name: nm, rid: slug(nm), kind: kindOf({ name: nm }), attrs: [], owned: {} }); persist(); } const s = findTracked(nm); researchOpen.add(s.id); startResearch(s); showPage("tracker"); } }, "Add set and research it") : null) : null));
+}
+
+/* ---------- build maker ---------- */
+function newBuild(fromSet) {
+  const b = { id: uid(), name: fromSet ? fromSet.name + " build" : "New build", slots: {} };
+  for (const sl of SLOTS) {
+    const src = fromSet ? baseName(fromSet) : "";
+    const d = src ? layoutDefaults(src, sl) : { core: "", subs: 1, subAttrs: [] };
+    const st0 = fromSet ? slotTargets(fromSet, sl)[0] : "";
+    const tgt = st0 ? st0.split(" + ") : [];
+    b.slots[sl] = { source: src, core: d.core, subs: Array.from({ length: d.subs }, (_, i) => ({ a: d.subAttrs[i] || tgt[i] || "", v: "" })) };
+  }
+  state.builds = state.builds || [];
+  state.builds.push(b); persist(); render();
+}
+
+function pieceStatus(p, slot) {
+  const subs = (p.subs || []).map(x => x.a).filter(Boolean);
+  if (!p.source || !subs.length) return null;
+  const entries = trackedAll(p.source);
+  if (entries.some(e => { const t = matchTarget(e, subs, slot); return t && isOwned(e, slot, t); })) return { cls: "ok", text: "Owned ✓" };
+  if (entries.some(e => matchTarget(e, subs, slot))) return { cls: "need", text: "Need" };
+  return { cls: "", text: "Not tracked", action: true };
+}
+
+function renderBuild(b) {
+  const bump = () => { persist(); render(); };
+  const rows = SLOTS.map(sl => {
+    const p = b.slots[sl] = b.slots[sl] || { source: "", core: "", subs: [{ a: "", v: "" }] };
+    const st = pieceStatus(p, sl);
+    const L = p.source ? layoutDefaults(p.source, sl) : null;
+    const subsWanted = p.subs.length;
+    return h("div", { class: "bslot" },
+      h("span", { class: "ic", style: `--img:url(${ICONS[sl]})`, "aria-hidden": "true" }),
+      h("span", { class: "sn" }, sl),
+      h("label", { class: "field" }, h("span", {}, "Set / brand / named"),
+        h("input", { id: `b-${b.id}-${sl}-src`, list: "allSets", value: p.source, placeholder: "Type to search", autocomplete: "off",
+          onchange: e => { p.source = e.target.value.trim(); const d = p.source ? layoutDefaults(p.source, sl) : null;
+            if (d) { if (d.core) p.core = d.core; while (p.subs.length < d.subs) p.subs.push({ a: "", v: "" }); p.subs.length = d.subs; d.subAttrs.forEach((a, i) => { if (!p.subs[i].a) p.subs[i].a = a; }); }
+            bump(); } })),
+      h("label", { class: "field" }, h("span", {}, "Core"),
+        selectEl(`b-${b.id}-${sl}-core`, [{ value: "", label: "—" }, ...CORES], p.core, e => { p.core = e.target.value; bump(); }, sl + " core")),
+      h("div", { class: "subs" },
+        p.subs.map((x, i) => h("div", { class: "sub" },
+          h("label", { class: "field" }, h("span", {}, "Sub " + (i + 1)),
+            selectEl(`b-${b.id}-${sl}-s${i}`, [["—", [""]], ...SUB_GROUPS], x.a, e => { x.a = e.target.value; bump(); }, sl + " sub " + (i + 1))),
+          h("label", { class: "field" }, h("span", {}, "%"),
+            h("input", { id: `b-${b.id}-${sl}-v${i}`, type: "number", step: "0.1", min: "0", value: x.v, placeholder: "roll", "aria-label": "Roll value",
+              onchange: e => { x.v = e.target.value; bump(); } })))),
+        h("button", { class: "btn ghost", title: subsWanted === 1 ? "Add a second sub attribute (brand and named pieces)" : "Remove the second sub attribute",
+          onclick: () => { if (p.subs.length === 1) p.subs.push({ a: "", v: "" }); else p.subs.length = 1; bump(); } }, subsWanted === 1 ? "+ sub" : "− sub")),
+      h("div", { class: "own" },
+        st ? h("div", { class: st.cls }, st.text) : h("div", { class: "hint" }, L ? "" : "Empty"),
+        st && st.action ? h("button", { class: "btn ghost", onclick: () => trackTarget(p.source, sl, p.subs.map(x => x.a)) }, "+ Track") : null));
+  });
+
+  // Summary: cores, set pieces and bonuses, sub totals
+  const cores = {}; const sets = {}; const subs = {};
+  for (const sl of SLOTS) {
+    const p = b.slots[sl]; if (!p) continue;
+    if (p.core) cores[p.core] = (cores[p.core] || 0) + 1;
+    if (p.source) sets[p.source] = (sets[p.source] || 0) + 1;
+    for (const x of p.subs || []) if (x.a) { subs[x.a] = subs[x.a] || { n: 0, v: 0 }; subs[x.a].n++; const n = parseFloat(x.v); if (!isNaN(n)) subs[x.a].v += n; }
+  }
+  const bonusRows = Object.entries(sets).sort((a, c) => c[1] - a[1]).map(([name, n]) => {
+    const r = research[rid(setLike(name))];
+    const list = r && r.status === "done" && Array.isArray(r.setBonuses) ? r.setBonuses : [];
+    return h("div", {}, h("div", { class: "kv" }, h("span", {}, name), h("span", {}, n + " pc")),
+      list.map(t => { const m = /^(\d)\s*pc/i.exec(t); const need = m ? +m[1] : 9; return h("div", { class: "bonus" + (n >= need ? " on" : "") }, t.length > 90 ? t.slice(0, 88) + "…" : t); }),
+      !list.length && (kindOf({ name }) !== "custom") ? h("div", { class: "hint" }, "Research this set to see its bonuses") : null);
+  });
+  const chc = subs.CHC ? subs.CHC.v : 0;
+  const sum = h("aside", { class: "bsum" },
+    h("h3", {}, "CORES"),
+    Object.keys(cores).length ? h("div", { class: "kv" }, Object.entries(cores).flatMap(([k, n]) => [h("span", {}, k), h("span", {}, "× " + n)])) : h("span", { class: "hint" }, "No cores picked yet"),
+    h("h3", {}, "SETS & BONUSES"),
+    bonusRows.length ? bonusRows : h("span", { class: "hint" }, "Pick a set for each slot"),
+    h("h3", {}, "SUB ATTRIBUTES"),
+    Object.keys(subs).length ? h("div", { class: "kv" }, Object.entries(subs).flatMap(([k, o]) => [h("span", {}, `${k} × ${o.n}`), h("span", {}, o.v ? "+" + Math.round(o.v * 10) / 10 + "%" : "—")])) : h("span", { class: "hint" }, "No subs picked yet"),
+    h("p", { class: "hint" }, "Totals add the roll values you enter, from gear only (no weapons, mods, watch or specialization)."),
+    chc > 60 ? h("p", { class: "warn" }, `CHC from gear is ${Math.round(chc * 10) / 10}%. Community sources cite a 60% crit chance cap, so some of this may be wasted. Check in game.`) : null);
+
+  const del = pendingDelete.has("b:" + b.id);
+  return h("article", { class: "build" },
+    h("div", { class: "build-head" },
+      h("input", { class: "build-name", id: "bn-" + b.id, value: b.name, "aria-label": "Build name", onchange: e => { b.name = e.target.value.trim() || "Untitled build"; bump(); } }),
+      del ? h("span", { class: "confirm" }, "Delete this build?",
+              h("button", { class: "btn danger", onclick: () => { state.builds = state.builds.filter(x => x.id !== b.id); pendingDelete.delete("b:" + b.id); bump(); } }, "Delete"),
+              h("button", { class: "btn ghost", onclick: () => { pendingDelete.delete("b:" + b.id); render(); } }, "Cancel"))
+          : [h("button", { class: "btn", onclick: () => { const c = JSON.parse(JSON.stringify(b)); c.id = uid(); c.name = b.name + " copy"; state.builds.push(c); bump(); } }, "Duplicate"),
+             h("button", { class: "btn danger", onclick: () => { pendingDelete.add("b:" + b.id); render(); } }, "Delete")]),
+    h("div", { class: "build-body" }, h("div", { class: "bslots" }, rows), sum));
+}
+
+function renderBuildsPage() {
+  fillDatalist();
+  renderDismantle();
+  const wrap = document.getElementById("builds");
+  const builds = state.builds || [];
+  if (!builds.length) {
+    wrap.replaceChildren(h("div", { class: "empty" },
+      h("p", {}, "No builds yet. Start from scratch, or from one of your tracked sets so its slots are filled in for you."),
+      h("div", { class: "row", style: "display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:10px" },
+        state.sets.map(s => h("button", { class: "btn", onclick: () => newBuild(s) }, "Start from " + s.name)))));
+    return;
+  }
+  wrap.replaceChildren(...builds.map(renderBuild));
+}
+document.getElementById("newBuild").addEventListener("click", () => newBuild(null));
+showPage(page);
+
+function toggle(set, slot, a) {
+  set.owned[slot] = set.owned[slot] || {};
+  if (set.owned[slot][a]) delete set.owned[slot][a]; else set.owned[slot][a] = true;
+  syncFromFarm(set, slot, a);
+  persist(); render();
+}
+
+document.getElementById("farmSearch").addEventListener("input", e => {
+  farmQuery = e.target.value; render();
+});
+document.getElementById("editToggle").addEventListener("click", () => { editing = !editing; pendingDelete.clear(); render(); });
+document.getElementById("addSet").addEventListener("click", () => openPicker(picker.hidden));
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") { clearTimeout(saveTimer); flush(); } });
+
+const COLLECTION_SEED = [["Future Initiative", "Dedicated healer collection; no Skill Haste or Status Effects variants.", [["Skill Tier", "Repair Skills"]]], ["Striker's Battlegear", "Critical-hit damage variants; prioritize the backpack for standard Striker use.", [["Weapon Damage", "CHC"], ["Weapon Damage", "CHD"]]], ["Negotiator's Dilemma", "Two critical-hit variants for multi-target DPS.", [["Weapon Damage", "CHC"], ["Weapon Damage", "CHD"]]], ["Eclipse Protocol", "Status-spread and crowd-control use.", [["Skill Tier", "Status Effects"]]], ["Hard Wired", "Skill-damage and cooldown variants, as counted in the conversation.", [["Skill Tier", "Skill Damage"], ["Skill Tier", "Skill Haste"]]], ["Heartbreaker", "Blue-core collection follows your previously stated preference for Heartbreaker Prototypes.", [["Armor", "CHC"], ["Armor", "CHD"]]], ["Aegis", "Specialized defensive/hazard-protection variant.", [["Armor", "Hazard Protection"]]], ["Umbra Initiative", "Critical-hit weapon DPS variants.", [["Weapon Damage", "CHC"], ["Weapon Damage", "CHD"]]], ["Rigger", "Damage and haste skill variants.", [["Skill Tier", "Skill Damage"], ["Skill Tier", "Skill Haste"]]], ["Tip of the Spear", "Critical-hit weapon DPS variants.", [["Weapon Damage", "CHC"], ["Weapon Damage", "CHD"]]], ["Ongoing Directive", "Weapon DPS plus a specialized status-support variant.", [["Weapon Damage", "CHC"], ["Weapon Damage", "CHD"], ["Weapon Damage", "Status Effects"]]], ["Hunter's Fury", "Close-range critical-hit DPS.", [["Weapon Damage", "CHC"], ["Weapon Damage", "CHD"]]], ["Hotshot", "One precision/headshot variant only.", [["Weapon Damage", "HSD"]]], ["Aces and Eights", "Precision and critical-hit rifle/MMR variants.", [["Weapon Damage", "HSD"], ["Weapon Damage", "CHC"], ["Weapon Damage", "CHD"]]], ["Breaking Point", "Rifle-oriented critical-hit DPS.", [["Weapon Damage", "CHC"], ["Weapon Damage", "CHD"]]], ["Cavalier", "Specialized resistance/support variant.", [["Armor", "Hazard Protection"]]], ["True Patriot", "Blue-core crit-oriented support/tank hybrids.", [["Armor", "CHC"], ["Armor", "CHD"]]], ["Core Strength", "Each core needs its own backpack: Armor and Skill Tier backpacks are listed separately, each with its own minor.", [["Armor", "CHC"], ["Armor", "CHD"], ["Skill Tier", "CHC"], ["Skill Tier", "CHD"], ["Armor", "Armor Regen"]]], ["Foundry Bulwark", "Blue-core offensive/shield and regeneration variants.", [["Armor", "CHC"], ["Armor", "CHD"], ["Armor", "Armor Regen"]]], ["Tipping Scales", "No skill-damage variants.", [["Weapon Damage", "CHC"], ["Weapon Damage", "CHD"]]], ["Concentrated Company", "Critical-hit DPS collection.", [["Weapon Damage", "CHC"], ["Weapon Damage", "CHD"]]], ["Ember Engine", "Status effect only, per your decision.", [["Skill Tier", "Status Effects"]]], ["Measured Assembly", "Critical-hit variants, as allocated in the conversation.", [["Weapon Damage", "CHC"], ["Weapon Damage", "CHD"]]], ["Ortiz: Exuro", "Single skill-damage variant.", [["Skill Tier", "Skill Damage"]]], ["Ortiz: Reficere", "Single repair-skills variant.", [["Skill Tier", "Repair Skills"]]], ["Refactor", "Single skill-damage variant, as selected.", [["Skill Tier", "Skill Damage"]]], ["Virtuoso", "Critical-hit weapon DPS variants.", [["Weapon Damage", "CHC"], ["Weapon Damage", "CHD"]]]];
+
+/* ---------- collection checklist (third tab) ---------- */
+// Seeded once from Sami's "Prototype Collection 304 Checklist" (plus the Skill Tier backpacks for Core Strength);
+// after that it lives in tracker/main as state.collection and is edited on the page.
+const MAX_PINS = 3;
+const MINOR_ALIAS = { "hazard": "Hazard Protection", "headshotdamage": "HSD", "headshot": "HSD", "critchance": "CHC", "critdamage": "CHD" };
+const canonMinor = m => MINOR_ALIAS[norm(m || "")] || m;
+const setKey = n => norm(String(n || "").replace(/&/g, " and "));
+const vLabel = v => `${v.core === "Weapon Damage" ? "WD" : v.core === "Skill Tier" ? "Skill" : v.core} · ${v.minor}`;
+const vSlots = v => Array.isArray(v.slots) ? v.slots : SLOTS;
+let colQuery = "", colFilter = "need", colEditing = false, farmQuery = "";
+// "Enter stats" mode: rolled values per collected piece, saved as v.vals = { Slot: { core, minor } } for drop checks.
+let colValues = false, colFilterBefore = null;
+const coreShort = c => c === "Weapon Damage" ? "WD" : c === "Skill Tier" ? "Skill" : c;
+function setColVal(v, slot, key, raw) {
+  const n = parseFloat(String(raw).replace(",", ".").replace(/[^0-9.\-]/g, ""));
+  v.vals = v.vals || {};
+  const cur = v.vals[slot] || {};
+  if (isFinite(n)) cur[key] = n; else delete cur[key];
+  if (Object.keys(cur).length) v.vals[slot] = cur; else delete v.vals[slot];
+  if (!Object.keys(v.vals).length) delete v.vals;
+  persist();
+}
+const colDrafts = {};
+try { colFilter = localStorage.getItem("d2-proto-colfilter") || "need"; } catch {}
+
+function seedCollection() {
+  return {
+    v: 1, pins: [],
+    sets: COLLECTION_SEED.map(([name, note, vs]) => ({
+      id: slug(name), name, note,
+      variants: vs.map(([core, minor, slots]) => ({ id: slug(core + "-" + minor), core, minor, ...(slots ? { slots } : {}), got: {} }))
+    }))
+  };
+}
+// Returns true when it had to create the checklist, so the caller can save it.
+function ensureCollection() {
+  if (state.collection && Array.isArray(state.collection.sets)) { state.collection.pins = state.collection.pins || []; return false; }
+  state.collection = seedCollection();
+  // First run: carry over what the Farm tracker already has.
+  for (const e of state.sets) for (const slot of SLOTS) for (const t of slotTargets(e, slot))
+    if (isOwned(e, slot, t)) for (const l of colLinks(e, slot, t)) l.v.got[slot] = true;
+  return true;
+}
+const colSetFor = name => state.collection && state.collection.sets.find(c => setKey(c.name) === setKey(name));
+
+// Core of a farm entry's slot, when it is known: confirmed by Sami, or a single core from research.
+function farmCore(e, slot) {
+  const L = slotLayout(e, slot);
+  if (L.source === "you") return L.core || null;
+  if (L.source === "research" && !L.unsure) { const hits = CORES.filter(c => (L.core || "").toLowerCase().includes(c.toLowerCase())); return hits.length === 1 ? hits[0] : null; }
+  return null;
+}
+// Collection rows that a Farm tracker button stands for. Only single-sub targets link, and only when the match is unambiguous.
+function colLinks(e, slot, label) {
+  if (!state.collection || /\+/.test(label)) return [];
+  const cs = colSetFor(baseName(e)); if (!cs) return [];
+  const core = farmCore(e, slot), minor = norm(canonMinor(label));
+  const hits = cs.variants.filter(v => norm(canonMinor(v.minor)) === minor && vSlots(v).includes(slot) && (!core || v.core === core));
+  return hits.length === 1 ? [{ cs, v: hits[0] }] : [];
+}
+// Farm tracker buttons that a collection row stands for.
+function farmLinks(cs, v, slot) {
+  const out = [];
+  for (const e of state.sets) if (setKey(baseName(e)) === setKey(cs.name))
+    for (const t of slotTargets(e, slot)) if (colLinks(e, slot, t).some(l => l.v === v)) out.push({ e, t });
+  return out;
+}
+function setColGot(cs, v, slot, val) {
+  if (val) v.got[slot] = true; else { delete v.got[slot]; if (v.vals) { delete v.vals[slot]; if (!Object.keys(v.vals).length) delete v.vals; } }
+  for (const { e, t } of farmLinks(cs, v, slot)) { e.owned[slot] = e.owned[slot] || {}; if (val) e.owned[slot][t] = true; else delete e.owned[slot][t]; }
+}
+function syncFromFarm(e, slot, label) {
+  const val = isOwned(e, slot, label);
+  for (const { cs, v } of colLinks(e, slot, label)) setColGot(cs, v, slot, val);
+}
+
+// A piece counts as collected only when you have it AND both its core and minor values are entered.
+const hasStats = (v, sl) => { const x = v.vals && v.vals[sl]; return !!(x && x.core != null && x.minor != null); };
+const isDone = (v, sl) => !!v.got[sl] && hasStats(v, sl);
+function colStats(sets) {
+  let total = 0, got = 0, done = 0, filled = 0, pending = 0;
+  for (const cs of sets) { let t = 0, g = 0; for (const v of cs.variants) for (const sl of vSlots(v)) { t++; if (isDone(v, sl)) { g++; filled++; } else if (v.got[sl]) pending++; } total += t; got += g; if (t && g === t) done++; }
+  return { total, got, done, filled, pending };
+}
+// Search: every word must appear in the set name, the variant's core/minor, or the slot.
+const SEARCH_ALIAS = { wd: "weapondamage", st: "skilltier", crit: "ch", regen: "armorregen", hsd: "hsd", headshot: "hsd", haz: "hazard" };
+function cellMatches(cs, v, slot, words) {
+  if (!words.length) return true;
+  const hay = norm(`${cs.name} ${v.core} ${v.minor} ${canonMinor(v.minor)} ${slot} ${v.core === "Weapon Damage" ? "wd" : v.core === "Skill Tier" ? "st" : ""}`);
+  return words.every(w => hay.includes(SEARCH_ALIAS[w] || w));
+}
+const queryWords = q => q.toLowerCase().split(/\s+/).map(norm).filter(Boolean);
+
+function togglePin(list, id) {
+  const i = list.indexOf(id);
+  if (i >= 0) list.splice(i, 1); else if (list.length < MAX_PINS) list.push(id);
+  persist(); render();
+}
+
+function renderColSet(cs, words) {
+  const C = state.collection;
+  const pinned = C.pins.includes(cs.id);
+  const st = colStats([cs]);
+  const complete = st.total > 0 && st.got === st.total;
+  const pct = st.total ? Math.round(st.got / st.total * 100) : 0;
+  const rows = [];
+  for (const v of cs.variants) {
+    const slots = vSlots(v);
+    const vis = SLOTS.map(sl => slots.includes(sl) && cellMatches(cs, v, sl, words));
+    const missing = slots.filter(sl => !isDone(v, sl));
+    if (!colEditing) {
+      if (words.length && !vis.some(Boolean)) continue;
+      if (colFilter === "need" && !slots.some(sl => !isDone(v, sl) && vis[SLOTS.indexOf(sl)])) continue;
+      if (colFilter === "have" && !slots.some(sl => isDone(v, sl))) continue;
+    }
+    const vdone = missing.length === 0 && slots.length > 0;
+    const delKey = "cv:" + cs.id + ":" + v.id;
+    rows.push(h("div", { class: "vrow" + (vdone ? " vdone" : "") },
+      h("span", { class: "vlabel" }, h("b", {}, vLabel(v)), h("small", {}, vdone ? "VARIANT COMPLETE ✓" : `${slots.length - missing.length} / ${slots.length}`)),
+      SLOTS.map((sl, i) => {
+        const inV = slots.includes(sl);
+        if (colEditing) return h("button", { class: "cell" + (inV ? "" : " ex"), title: inV ? `Remove ${sl} from this variant` : `Add ${sl} to this variant`,
+          onclick: () => { const cur = vSlots(v).slice(); v.slots = inV ? cur.filter(x => x !== sl) : SLOTS.filter(x => cur.includes(x) || x === sl); if (inV) delete v.got[sl]; if (v.slots.length === 6) delete v.slots; persist(); render(); } },
+          inV ? "Included" : "Not needed");
+        if (!inV) return h("span", { class: "cell na", title: "Not on your list" }, "—");
+        const own = !!v.got[sl];
+        const val = own && v.vals && v.vals[sl];
+        const done = own && hasStats(v, sl);
+        // Every piece shows its stat boxes, so values are readable while scrolling. Typing a value ticks the piece.
+        const valIn = key => h("input", { type: "text", inputmode: "decimal", id: `cv-${cs.id}-${v.id}-${sl}-${key}`, value: val && val[key] != null ? String(val[key]) : "", placeholder: "–",
+          "aria-label": `${cs.name} ${sl} ${key === "core" ? v.core : v.minor} value`,
+          onchange: e => { const typed = e.target.value.trim() !== ""; if (!v.got[sl] && typed) setColGot(cs, v, sl, true); setColVal(v, sl, key, e.target.value); setTimeout(render); } });
+        const linked = farmLinks(cs, v, sl).length > 0;
+        const unKey = "un:" + cs.id + ":" + v.id + ":" + sl;
+        const asking = own && pendingDelete.has(unKey);
+        return h("div", { class: "cellv" + (done ? "" : own ? " partial" : " need") + (vis[i] ? "" : " off") },
+          h("button", { class: "cell tick" + (linked ? " linked" : "") + (asking ? " asking" : ""), "aria-pressed": own ? "true" : "false",
+            title: `${cs.name} ${sl}, ${v.core} / ${v.minor}: ${done ? "collected" : own ? "you have it, but it only counts once both values are entered" : "still needed"}. ${own ? "Click to untick" : "Click if you have it"}${linked ? ". Synced with the Farm tracker" : ""}`,
+            onclick: () => {
+              if (own && val && !asking) { pendingDelete.add(unKey); render(); return; }
+              pendingDelete.delete(unKey); setColGot(cs, v, sl, !own); persist(); render(); } },
+            h("span", { class: "box", html: CHECK }), asking ? "Untick? Clears stats" : sl, own && !done && !asking ? h("small", { class: "need-stats" }, "add stats") : null),
+          h("label", { title: v.core }, h("span", {}, coreShort(v.core)), valIn("core")),
+          h("label", { title: v.minor }, h("span", {}, v.minor), valIn("minor")));
+      }),
+      colEditing
+        ? (pendingDelete.has(delKey)
+            ? h("span", { class: "confirm", style: "grid-column:1/-1" }, `Remove ${vLabel(v)} from ${cs.name}?`,
+                h("button", { class: "btn danger", onclick: () => { cs.variants = cs.variants.filter(x => x !== v); pendingDelete.delete(delKey); persist(); render(); } }, "Remove"),
+                h("button", { class: "btn ghost", onclick: () => { pendingDelete.delete(delKey); render(); } }, "Cancel"))
+            : h("button", { class: "vdel", "aria-label": `Remove ${vLabel(v)}`, title: "Remove this variant", onclick: () => { pendingDelete.add(delKey); render(); } }, "×"))
+        : h("span", {})));
+  }
+  if (!rows.length && !colEditing) return null;
+
+  const head = h("div", { class: "set-head" },
+    h("h2", { class: "set-name" }, cs.name),
+    complete ? h("span", { class: "badge done" }, "Set complete ✓") : null,
+    h("button", { class: "btn pin-btn", "aria-pressed": pinned ? "true" : "false", disabled: !pinned && C.pins.length >= MAX_PINS ? "" : false,
+      title: pinned ? "Unpin" : C.pins.length >= MAX_PINS ? "You already have 3 pinned. Unpin one first." : "Pin to the top for this session",
+      onclick: () => togglePin(C.pins, cs.id) }, pinned ? "★ Pinned" : "☆ Pin"),
+    h("div", { class: "set-count" }, h("div", { class: "n" }, `${st.got} / ${st.total}`), h("div", { class: "p" }, `${pct}% COLLECTED`)));
+  const bar = h("div", { class: "bar", role: "progressbar", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": pct, "aria-label": cs.name + " collection progress" },
+    h("span", { style: `width:${pct}%` }), h("i", { class: "bar-ticks" }));
+  const header = h("div", { class: "vrow vh" }, h("span", {}, "Variant"), SLOTS.map(sl => h("span", {}, h("i", { class: "ic", style: `--img:url(${ICONS[sl]})` }), sl)), h("span", {}));
+  const card = h("article", { class: "set cset" + (complete ? " complete" : "") + (pinned ? " pinned" : "") }, head,
+    cs.note ? h("p", { class: "cnote" }, cs.note) : null, bar,
+    h("div", { class: "vtable" }, header, rows.length ? rows : h("p", { class: "hint", style: "padding:10px 0" }, "No variants. Add one below.")));
+  if (colEditing) card.append(renderVariantAdd(cs));
+  return card;
+}
+
+function renderVariantAdd(cs) {
+  const d = colDrafts[cs.id] || (colDrafts[cs.id] = { core: "Weapon Damage", minor: "CHC", slots: SLOTS.slice() });
+  const delKey = "cs:" + cs.id;
+  return h("div", { class: "vadd" },
+    h("label", { class: "field" }, h("span", {}, "Core"), selectEl(`cv-${cs.id}-core`, CORES, d.core, e => { d.core = e.target.value; }, "Core")),
+    h("label", { class: "field" }, h("span", {}, "Minor"), selectEl(`cv-${cs.id}-minor`, SUB_GROUPS, d.minor, e => { d.minor = e.target.value; }, "Minor attribute")),
+    h("div", { class: "field" }, h("span", {}, "Slots"), h("div", { class: "slotpick" }, SLOTS.map(sl => h("label", {},
+      h("input", { type: "checkbox", checked: d.slots.includes(sl) ? "" : false, onchange: e => { d.slots = e.target.checked ? SLOTS.filter(x => d.slots.includes(x) || x === sl) : d.slots.filter(x => x !== sl); } }), sl)))),
+    h("button", { class: "btn primary", onclick: () => {
+      if (!d.slots.length) return;
+      const exists = cs.variants.find(v => v.core === d.core && norm(canonMinor(v.minor)) === norm(d.minor));
+      if (exists) { const cur = vSlots(exists); exists.slots = SLOTS.filter(x => cur.includes(x) || d.slots.includes(x)); if (exists.slots.length === 6) delete exists.slots; }
+      else cs.variants.push({ id: slug(d.core + "-" + d.minor) + "-" + uid().slice(0, 4), core: d.core, minor: d.minor, ...(d.slots.length === 6 ? {} : { slots: d.slots.slice() }), got: {} });
+      persist(); render(); } }, "+ Add variant"),
+    h("span", { style: "margin-left:auto" }),
+    pendingDelete.has(delKey)
+      ? h("span", { class: "confirm" }, `Remove ${cs.name} and its ticks?`,
+          h("button", { class: "btn danger", onclick: () => { const C = state.collection; C.sets = C.sets.filter(x => x !== cs); C.pins = C.pins.filter(x => x !== cs.id); pendingDelete.delete(delKey); persist(); render(); } }, "Remove set"),
+          h("button", { class: "btn ghost", onclick: () => { pendingDelete.delete(delKey); render(); } }, "Cancel"))
+      : h("button", { class: "btn danger", onclick: () => { pendingDelete.add(delKey); render(); } }, "Remove set"));
+}
+
+function renderCollectionPage() {
+  const page = document.getElementById("page-collection");
+  if (!state.collection) return;
+  const C = state.collection;
+  const focusId = document.activeElement && document.activeElement.id;
+  const caret = focusId === "colSearch" ? document.activeElement.selectionStart : null;
+  const words = queryWords(colQuery);
+  const all = colStats(C.sets);
+  const pinnedSets = C.pins.map(id => C.sets.find(s => s.id === id)).filter(Boolean);
+  const rest = C.sets.filter(s => !C.pins.includes(s.id));
+  const pinnedCards = pinnedSets.map(cs => renderColSet(cs, words)).filter(Boolean);
+  const restCards = rest.map(cs => renderColSet(cs, words)).filter(Boolean);
+  const seg = (val, label) => h("button", { "aria-pressed": colFilter === val ? "true" : "false", onclick: () => { colFilter = val; try { localStorage.setItem("d2-proto-colfilter", val); } catch {} render(); } }, label);
+
+  page.replaceChildren(...[
+    h("div", { class: "col-head" },
+      h("div", {}, h("h2", { class: "page-h" }, "Prototype collection checklist"),
+        h("p", {}, "Every piece you want to keep, by set, core and minor. Tick a piece when you have it as a Prototype. Pieces marked ⇄ are synced with the Farm tracker.")),
+      h("div", { class: "summary" },
+        h("div", { class: "stat" }, h("span", { class: "k" }, "Collected"), h("span", { class: "v" }, String(all.got), h("small", {}, " / " + all.total))),
+        h("div", { class: "stat" }, h("span", { class: "k" }, "Still needed"), h("span", { class: "v" }, String(all.total - all.got))),
+        h("div", { class: "stat" }, h("span", { class: "k" }, "Collected, missing values"), h("span", { class: "v" }, String(all.pending))),
+        h("div", { class: "stat" }, h("span", { class: "k" }, "Sets complete"), h("span", { class: "v" }, String(all.done), h("small", {}, " / " + C.sets.length))))),
+    h("div", { class: "findbar" },
+      h("input", { id: "colSearch", type: "search", value: colQuery, placeholder: "Search, e.g. striker, backpack CHD, skill haste", autocomplete: "off", "aria-label": "Search the checklist",
+        oninput: e => { colQuery = e.target.value; render(); } }),
+      h("div", { class: "seg", role: "group", "aria-label": "Show" }, seg("need", "Still needed"), seg("all", "All"), seg("have", "Collected")),
+      h("button", { class: "btn", "aria-pressed": colEditing ? "true" : "false", onclick: () => { colEditing = !colEditing; colValues = false; if (colFilterBefore) { colFilter = colFilterBefore; colFilterBefore = null; } pendingDelete.clear(); render(); } }, colEditing ? "Done editing" : "Edit list")),
+    h("p", { class: "hint", style: "margin:10px 0 0;color:var(--muted)" }, "Type a piece's rolled values in the boxes under it: core first, then the minor (for example 15 and 5.8). A piece only counts as collected once both are filled in. Orange means you have it but a value is missing."),
+    colEditing ? h("div", { class: "col-add" },
+      h("label", { class: "field" }, h("span", {}, "Add a gear set"), h("input", { id: "colAddName", list: "allSets", placeholder: "Type to search", autocomplete: "off" })),
+      h("button", { class: "btn primary", onclick: () => {
+        const nm = document.getElementById("colAddName").value.trim(); if (!nm) return;
+        if (colSetFor(nm)) { colQuery = nm; colEditing = false; render(); return; }
+        const name = GEAR_SETS.find(n => setKey(n) === setKey(nm)) || nm;
+        C.sets.push({ id: slug(name) + (C.sets.some(s => s.id === slug(name)) ? "-" + uid().slice(0, 4) : ""), name, note: "", variants: [] });
+        persist(); render(); } }, "+ Add set"),
+      h("span", { class: "hint" }, "Click a slot to include or exclude it. × removes a variant.")) : null,
+    colEditing ? null : renderMissingVals(C),
+    pinnedCards.length ? h("div", { class: "pin-h" }, `Pinned (${C.pins.length}/${MAX_PINS})`) : null,
+    pinnedCards.length ? h("div", { class: "sets" }, pinnedCards) : null,
+    pinnedCards.length && restCards.length ? h("div", { class: "pin-h", style: "color:var(--muted)" }, "All sets") : null,
+    restCards.length ? h("div", { class: "sets" }, restCards)
+      : !pinnedCards.length ? h("div", { class: "empty", style: "margin-top:24px" }, words.length ? "Nothing matches that search." : colFilter === "need" ? "Nothing left to collect ✓" : "Nothing here yet.") : null].filter(Boolean));
+  if (focusId === "colSearch") { const el = document.getElementById("colSearch"); el.focus(); if (caret != null) el.setSelectionRange(caret, caret); }
+  else if (focusId && /^(cv|mv)-/.test(focusId)) { const el = document.getElementById(focusId); if (el) { el.focus(); try { el.select(); } catch {} } }
+}
+
+// "Collected, missing values": pieces you have (often ticked from the Farm tracker) whose core or minor value isn't entered yet.
+let mvOpen = true;
+try { mvOpen = localStorage.getItem("d2-proto-mvopen") !== "0"; } catch {}
+function renderMissingVals(C) {
+  const list = [];
+  for (const cs of C.sets) for (const v of cs.variants) for (const sl of vSlots(v)) if (v.got[sl] && !hasStats(v, sl)) list.push({ cs, v, sl });
+  if (!list.length) return null;
+  const inp = (x, key) => { const val = x.v.vals && x.v.vals[x.sl];
+    return h("input", { type: "text", inputmode: "decimal", id: `mv-${x.cs.id}-${x.v.id}-${x.sl}-${key}`, value: val && val[key] != null ? String(val[key]) : "", placeholder: "–",
+      "aria-label": `${x.cs.name} ${x.sl} ${key === "core" ? x.v.core : x.v.minor} value`,
+      onchange: e => { setColVal(x.v, x.sl, key, e.target.value); setTimeout(render); } }); };
+  return h("section", { class: "mv" },
+    h("button", { class: "mv-head", "aria-expanded": mvOpen ? "true" : "false", onclick: () => { mvOpen = !mvOpen; try { localStorage.setItem("d2-proto-mvopen", mvOpen ? "1" : "0"); } catch {} render(); } },
+      h("span", {}, `Collected, missing values (${list.length})`), h("small", {}, mvOpen ? "Hide" : "Show")),
+    mvOpen ? h("p", { class: "hint", style: "margin:0" }, "You have these pieces (some came over from the Farm tracker), but they only count as collected once both values are in. Type them here or on the card.") : null,
+    mvOpen ? h("div", { class: "mv-list" }, list.map(x => h("div", { class: "mv-row" },
+      h("span", { class: "mv-name" }, h("i", { class: "ic", style: `--img:url(${ICONS[x.sl]})` }), h("b", {}, x.cs.name), ` ${x.sl}`),
+      h("span", { class: "mv-var" }, vLabel(x.v)),
+      h("label", {}, h("span", {}, coreShort(x.v.core)), inp(x, "core")),
+      h("label", {}, h("span", {}, x.v.minor), inp(x, "minor"))))) : null);
+}
+
+// Dismantle check against the checklist: { need:[...], have:[...], onList:boolean, set }
+function colCheck(name, slot, core, subs) {
+  const cs = colSetFor(name);
+  if (!cs) return null;
+  const minors = subs.filter(Boolean).map(m => norm(canonMinor(m)));
+  if (!minors.length) return { cs, need: [], have: [] };
+  const hits = cs.variants.filter(v => vSlots(v).includes(slot) && minors.includes(norm(canonMinor(v.minor))) && (!core || v.core === core));
+  return { cs, need: hits.filter(v => !v.got[slot]), have: hits.filter(v => v.got[slot]) };
+}
+
+/* ---------- backup, first run, offline ---------- */
+let firstRun = false;
+function showWelcome() {
+  let dismissed = false;
+  try { dismissed = localStorage.getItem("d2-proto-welcome-done") === "1"; } catch {}
+  document.getElementById("welcome").hidden = !(firstRun && !dismissed);
+}
+function hideWelcome() {
+  try { localStorage.setItem("d2-proto-welcome-done", "1"); } catch {}
+  document.getElementById("welcome").hidden = true;
+}
+let toastTimer = null;
+function toast(text) {
+  let el = document.getElementById("toast");
+  if (!el) { el = h("div", { id: "toast", class: "toast", role: "status" }); document.body.append(el); }
+  el.textContent = text; el.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 3500);
+}
+
+async function exportBackup() {
+  const backup = { app: "gear-tracker", format: 1, exportedAt: new Date().toISOString(), tracker: state, research };
+  const name = `gear-tracker-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+  // On phones, the share sheet is the reliable way to save a file (Files, Drive, AirDrop...).
+  try {
+    const file = new File([blob], name, { type: "application/json" });
+    if (matchMedia("(pointer: coarse)").matches && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: "Gear tracker backup" });
+      return;
+    }
+  } catch (e) { if (e && e.name === "AbortError") return; }
+  const a = h("a", { href: URL.createObjectURL(blob), download: name });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  toast("Backup saved: " + name);
+}
+
+function importBackup(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try { data = JSON.parse(reader.result); } catch { toast("That file isn't a tracker backup."); return; }
+    // Accept a full backup ({ tracker, research }) or a bare tracker state ({ sets: [...] }).
+    const tracker = data && valid(data.tracker) ? data.tracker : valid(data) ? data : null;
+    if (!tracker) { toast("That file isn't a tracker backup."); return; }
+    const when = data.exportedAt ? ` from ${fmtDate(data.exportedAt)}` : "";
+    const n = tracker.sets.length;
+    const nothingYet = state.sets.every(s => s.example) && !(state.builds || []).length;
+    if (!nothingYet && !confirm(`Replace the progress on this device with the backup${when}? It has ${n} tracked set${n === 1 ? "" : "s"}.`)) return;
+    state = JSON.parse(JSON.stringify(tracker));
+    if (data.research && typeof data.research === "object") { research = data.research; lsWriteResearch(research); }
+    firstRun = false; hideWelcome();
+    persist(); render();
+    toast(`Imported ${n} tracked set${n === 1 ? "" : "s"}${when}.`);
+  };
+  reader.onerror = () => toast("Couldn't read that file.");
+  reader.readAsText(file);
+}
+
+{
+  const fileInput = document.getElementById("importFile");
+  const pick = () => { fileInput.value = ""; fileInput.click(); };
+  fileInput.addEventListener("change", () => { if (fileInput.files[0]) importBackup(fileInput.files[0]); });
+  document.getElementById("importBtn").addEventListener("click", pick);
+  document.getElementById("welcomeImport").addEventListener("click", pick);
+  document.getElementById("welcomeDismiss").addEventListener("click", () => { hideWelcome(); firstRun = false; persist(); });
+  document.getElementById("exportBtn").addEventListener("click", exportBackup);
+}
+
+if ("serviceWorker" in navigator && window.isSecureContext) {
+  window.addEventListener("load", () => { navigator.serviceWorker.register("sw.js").catch(() => {}); });
+}
+
+initStorage();
+</script>
+
+</body>
+</html>
